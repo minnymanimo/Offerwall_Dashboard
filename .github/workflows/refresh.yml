@@ -1,0 +1,32 @@
+name: Refresh offerwall dashboard data
+
+on:
+  schedule:
+    - cron: '0 * * * *'   # 매시 정각(UTC)마다 실행 — 원본 데이터는 하루 한 번만 갱신되므로 충분히 여유 있는 주기
+  workflow_dispatch:        # 저장소의 Actions 탭에서 "Run workflow" 버튼으로 수동 실행도 가능
+
+permissions:
+  contents: write   # data.json을 다시 커밋/푸시하려면 필요
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Fetch sheet data and rebuild data.json
+        run: python scripts/refresh_data.py
+
+      - name: Commit updated data.json (변경된 경우에만)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data.json
+          git diff --cached --quiet && echo "변경 사항 없음 — 커밋 생략" || git commit -m "데이터 자동 갱신 [skip ci]"
+          git push
