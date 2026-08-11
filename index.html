@@ -721,15 +721,17 @@ document.getElementById('selectAllBtn').addEventListener('click', () => setAllSe
 document.getElementById('clearAllBtn').addEventListener('click', () => setAllSeries(false));
 
 /* ---------- 데이터 로드 (data.json은 GitHub Actions가 주기적으로 갱신) ---------- */
-function loadData(bust){
-  const url = './data.json' + (bust ? ('?t=' + Date.now()) : '');
+// GitHub Pages는 CDN(Fastly)을 거치기 때문에, 매번 쿼리스트링을 다르게 붙여서
+// 캐시된 옛 데이터가 아니라 항상 최신 data.json을 받아오도록 함
+function loadData(){
+  const url = './data.json?t=' + Date.now();
   return fetch(url, {cache: 'no-store'}).then(res => {
     if (!res.ok) throw new Error('data.json 요청 실패: HTTP ' + res.status);
     return res.json();
   });
 }
 
-loadData(false)
+loadData()
   .then(payload => init(payload))
   .catch(err => {
     kpiGrid.innerHTML = '<div style="color:var(--down);font-size:13px;">데이터를 불러오지 못했습니다 (' +
@@ -745,7 +747,7 @@ function refreshData(){
   refreshing = true;
   const indicator = document.getElementById('refreshIndicator');
   indicator.textContent = '갱신 중…';
-  loadData(true)
+  loadData()
     .then(payload => {
       reinit(payload);
       indicator.textContent = '';
