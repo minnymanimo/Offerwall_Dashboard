@@ -2,8 +2,12 @@
 """
 오퍼월 광고 매출 대시보드 — 데이터 갱신 스크립트 (GitHub Actions에서 실행)
 
-구글시트 4개 벤더 탭(NBT_Adison, Buzzvil, APCORN_SSP, ADOP)을 공개 gviz 엔드포인트로
-읽어와 정리한 뒤 data.json으로 저장합니다.
+세 개의 JSON을 만듭니다:
+- data.json      : 벤더 통합 일별 매출 (NBT_Adison, Buzzvil, APCORN_SSP, ADOP, Mobwith_A)
+- mobwith-a.json  : Mobwith A 일별 상세 지표(노출수/클릭수/CTR/CPC/정산금액/eCPM)
+- mobwith-b.json  : Mobwith B 지면별 스냅샷(노출수/클릭수/CTR/CPC/정산금액/eCPM)
+
+구글시트를 공개 gviz 엔드포인트로 읽어옵니다.
 
 전제조건: 이 스프레드시트가 "링크가 있는 모든 사용자: 뷰어"로 공유되어 있어야 합니다
 (gviz 엔드포인트는 인증 없이 호출되므로, 시트 자체가 링크 공개 상태가 아니면 빈 결과가 옵니다).
@@ -32,7 +36,17 @@ VENDOR_CONFIG = {
                    'unit': 'media_cost', 'unit_krw': 'media_cost (원화 환산)', 'currency': 'USD'},
     'ADOP':       {'label': 'ADOP', 'date_col': 'date', 'value_col': 'mediaRevNo',
                    'unit': 'mediaRevNo', 'unit_krw': 'mediaRevNo (원화 환산)', 'currency': 'USD'},
+    'Mobwith A':  {'label': 'Mobwith A', 'date_col': '날 짜', 'value_col': '정산금액',
+                   'unit': '정산금액 (원)', 'currency': 'KRW'},
 }
+
+# Mobwith A 상세 지표(일별)에서 쓰는 원본 컬럼명 — 정산금액은 VENDOR_CONFIG와 공유
+MOBWITH_A_SHEET = 'Mobwith A'
+MOBWITH_A_COLS = {'date': '날 짜', 'impressions': '노출수', 'clicks': '클릭수', 'revenue': '정산금액'}
+
+# Mobwith B 지면별 스냅샷에서 쓰는 원본 컬럼명 (날짜 없이 지면명이 행 단위)
+MOBWITH_B_SHEET = 'Mobwith B'
+MOBWITH_B_COLS = {'name': '지면명', 'impressions': '노출수', 'clicks': '클릭수', 'revenue': '정산금액'}
 
 # gviz 응답은 "google.visualization.Query.setResponse({...});" 형태의 JSONP 래퍼로 옴
 GVIZ_RESPONSE_RE = re.compile(r'^[^(]*\((.*)\);?\s*$', re.DOTALL)
@@ -80,7 +94,7 @@ def parse_gviz_value(v):
 def normalize_date(v):
     v = parse_gviz_value(v)
     if isinstance(v, date):
-        return v.isoformat()
+        return v.strftime('%Y-%m-%d')
     if isinstance(v, bool):
         return None
     if isinstance(v, (int, float)):
@@ -123,6 +137,93 @@ def read_vendor_series(sheet_name, date_col, value_col):
             continue
         by_date[d] = float(v)  # 중복 날짜는 마지막 값으로 덮어씀 (실측상 값 동일)
     return by_date
+
+
+def read_sheet_rows_by_cols(sheet_name, cols_map):
+    """cols_map: {key: 헤더라벨}. 시트에서 해당 컬럼들만 뽑아 {key: 원시값, ...} 딕셔너리
+    리스트로 반환한다 (parse_gviz_value 적용 전 원시값). 필요한 헤더가 하나라도 없으면
+    빈 리스트를 반환해 상위 로직이 안전하게 폴백하도록 한다. 모든 값이 비어있는 행
+    (시트 끝의 빈 줄 등)은 건너뛴다."""
+    cols, rows = fetch_sheet_rows(sheet_name)
+    idx = {}
+    for key, label in cols_map.items():
+        if label not in cols:
+            return []
+        idx[key] = cols.index(label)
+    out = []
+    for row in rows:
+        if all((row[i] is None) for i in idx.values() if i < len(row)):
+            continue
+        out.append({key: (row[i] if i < len(row) else None) for key, i in idx.items()})
+    return out
+
+
+def _num_or_none(v):
+    v = parse_gviz_value(v)
+    if isinstance(v, bool) or not isinstance(v, (int, float)):
+        return None
+    return float(v)
+
+
+def build_mobwith_a_payload(fetch_fn=None):
+    """Mobwith A 일별 상세 지표: 노출수/클릭수/정산금액(원본) + CTR/CPC/eCPM(파생값).
+    비율 지표는 항상 노출수·클릭수·정산금액의 합에서 계산해, 기간 평균을 낼 때도
+    '일별 비율의 단순평균'이 아니라 올바른 가중평균이 되도록 프론트에서 재사용한다."""
+    fetch_fn = fetch_fn or read_sheet_rows_by_cols
+    rows = fetch_fn(MOBWITH_A_SHEET, MOBWITH_A_COLS)
+
+    by_date = {}
+    for r in rows:
+        d = normalize_date(r.get('date'))
+        imp, clk, rev = _num_or_none(r.get('impressions')), _num_or_none(r.get('clicks')), _num_or_none(r.get('revenue'))
+        if not d or imp is None or clk is None or rev is None:
+            continue
+        by_date[d] = (imp, clk, rev)  # 중복 날짜는 마지막 값으로 덮어씀
+
+    if not by_date:
+        return {'dates': [], 'impressions': [], 'clicks': [], 'revenue': [],
+                'ctr': [], 'cpc': [], 'ecpm': [], 'gaps': [], 'generatedAt': now_str()}
+
+    date_keys = sorted(by_date.keys())
+    dates = build_date_range(date_keys[0], date_keys[-1])
+
+    impressions = [by_date[d][0] if d in by_date else None for d in dates]
+    clicks = [by_date[d][1] if d in by_date else None for d in dates]
+    revenue = [by_date[d][2] if d in by_date else None for d in dates]
+    ctr = [(c / i) if (i) else None for i, c in zip(impressions, clicks)]
+    cpc = [(r / c) if (c) else None for c, r in zip(clicks, revenue)]
+    ecpm = [(r / i * 1000) if (i) else None for i, r in zip(impressions, revenue)]
+
+    return {
+        'dates': dates,
+        'impressions': impressions, 'clicks': clicks, 'revenue': revenue,
+        'ctr': ctr, 'cpc': cpc, 'ecpm': ecpm,
+        'gaps': find_gaps(revenue),
+        'generatedAt': now_str(),
+    }
+
+
+def build_mobwith_b_payload(fetch_fn=None):
+    """Mobwith B 지면별 스냅샷 — 날짜 축이 없는, 지면(행) 단위 집계."""
+    fetch_fn = fetch_fn or read_sheet_rows_by_cols
+    rows = fetch_fn(MOBWITH_B_SHEET, MOBWITH_B_COLS)
+
+    placements = []
+    for r in rows:
+        name = r.get('name')
+        if not isinstance(name, str) or not name.strip():
+            continue
+        imp, clk, rev = _num_or_none(r.get('impressions')), _num_or_none(r.get('clicks')), _num_or_none(r.get('revenue'))
+        if imp is None or clk is None or rev is None:
+            continue
+        placements.append({
+            'name': name.strip(),
+            'impressions': imp, 'clicks': clk, 'revenue': rev,
+            'ctr': (clk / imp) if imp else None,
+            'cpc': (rev / clk) if clk else None,
+            'ecpm': (rev / imp * 1000) if imp else None,
+        })
+    return {'placements': placements, 'generatedAt': now_str()}
 
 
 def build_date_range(start_s, end_s):
@@ -247,3 +348,13 @@ if __name__ == '__main__':
         json.dump(payload, f, ensure_ascii=False)
     print('wrote data.json: %d dates, %d vendors' % (
         len(payload.get('dates', [])), len(payload.get('vendors', {}))))
+
+    mobwith_a = build_mobwith_a_payload()
+    with open('mobwith-a.json', 'w', encoding='utf-8') as f:
+        json.dump(mobwith_a, f, ensure_ascii=False)
+    print('wrote mobwith-a.json: %d dates' % len(mobwith_a.get('dates', [])))
+
+    mobwith_b = build_mobwith_b_payload()
+    with open('mobwith-b.json', 'w', encoding='utf-8') as f:
+        json.dump(mobwith_b, f, ensure_ascii=False)
+    print('wrote mobwith-b.json: %d placements' % len(mobwith_b.get('placements', [])))
