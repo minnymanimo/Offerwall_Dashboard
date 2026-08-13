@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<base target="_top">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<script src="./vendor/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#0b0b11;
+    --surface:#15151f;
+    --surface-2:#1b1b28;
+    --border:#282836;
+    --text:#eceaf4;
+    --text-dim:#918fa3;
+    --text-faint:#54526a;
+    --accent:#8b6fff;
+    --accent-soft:rgba(139,111,255,0.14);
+    --c-metric:#60a5fa;
+    --up:#5ee6a4;
+    --down:#f6789e;
+    --mono:'JetBrains Mono','SF Mono',Consolas,'Courier New',monospace;
+    --sans:'Malgun Gothic','Apple SD Gothic Neo','Noto Sans KR',sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:
+      radial-gradient(ellipse 900px 500px at 15% -10%, rgba(139,111,255,0.10), transparent 60%),
+      var(--bg);
+    color:var(--text);
+    font-family:var(--sans);
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1180px;margin:0 auto;padding:40px 24px 64px;}
+
+  .pagenav{display:flex;gap:6px;margin-bottom:20px;}
+  .pagenav a{
+    font-family:var(--mono);font-size:11.5px;color:var(--text-dim);text-decoration:none;
+    background:var(--surface);border:1px solid var(--border);border-radius:8px;
+    padding:7px 14px;transition:border-color .12s ease, color .12s ease;
+  }
+  .pagenav a:hover{color:var(--text);border-color:var(--accent);}
+  .pagenav a.active{color:var(--accent);border-color:var(--accent);background:var(--accent-soft);font-weight:700;}
+
+  header{
+    display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:16px;
+    padding-bottom:22px;margin-bottom:24px;border-bottom:1px solid var(--border);
+  }
+  .eyebrow{
+    font-family:var(--mono);font-size:11px;letter-spacing:0.16em;color:var(--accent);
+    text-transform:uppercase;margin-bottom:10px;
+  }
+  h1{font-size:24px;font-weight:700;margin:0 0 6px;letter-spacing:-0.01em;}
+  .subtitle{font-size:13px;color:var(--text-dim);}
+  .subtitle b{color:var(--text);font-weight:600;}
+  .meta-box{font-family:var(--mono);font-size:11.5px;color:var(--text-dim);text-align:right;line-height:1.7;}
+  .meta-box .pill{
+    display:inline-block;padding:2px 8px;border-radius:20px;
+    background:var(--accent-soft);color:var(--accent);font-size:10.5px;margin-left:6px;
+  }
+  .refresh-row{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:4px;}
+  #refreshIndicator{font-size:10.5px;color:var(--accent);min-width:70px;text-align:right;}
+  #refreshBtn{
+    font-family:var(--mono);font-size:10.5px;color:var(--text-dim);
+    background:var(--surface);border:1px solid var(--border);border-radius:6px;
+    padding:3px 9px;cursor:pointer;
+  }
+  #refreshBtn:hover{color:var(--text);border-color:var(--accent);}
+
+  .controls-row{
+    display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px;
+    margin-bottom:22px;
+  }
+  .controls{display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+  .seg{display:flex;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+  .seg button{
+    font-family:var(--mono);font-size:11px;color:var(--text-dim);
+    background:transparent;border:0;padding:6px 12px;cursor:pointer;border-right:1px solid var(--border);
+  }
+  .seg button:last-child{border-right:0;}
+  .seg button:hover{color:var(--text);}
+  .seg button.active{background:var(--accent-soft);color:var(--accent);font-weight:700;}
+  .seg button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px;}
+  .date-range{display:flex;align-items:center;gap:6px;}
+  .date-range input[type="date"]{
+    font-family:var(--mono);font-size:11px;color:var(--text);
+    background:var(--surface-2);border:1px solid var(--border);border-radius:7px;
+    padding:5px 8px;color-scheme:dark;cursor:pointer;
+  }
+  .date-range input:focus-visible{outline:2px solid var(--accent);outline-offset:-1px;}
+  .date-range span{font-family:var(--mono);font-size:11px;color:var(--text-faint);}
+  .period-label{font-family:var(--mono);font-size:10.5px;color:var(--text-faint);}
+
+  .kpi-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:28px;}
+  .kpi-card{
+    background:var(--surface);border:1px solid var(--border);border-radius:14px;
+    padding:16px;position:relative;overflow:hidden;
+  }
+  .kpi-card::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;background:var(--c-metric);}
+  .kpi-label{font-size:11.5px;color:var(--text-dim);font-weight:600;margin-bottom:10px;}
+  .kpi-value{font-family:var(--mono);font-size:18px;font-weight:700;letter-spacing:-0.02em;}
+  .kpi-unit{font-size:10px;color:var(--text-faint);margin-top:3px;}
+
+  .chart-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:28px;}
+  .chart-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px 16px 8px;}
+  .chart-title{font-size:12.5px;font-weight:700;margin-bottom:8px;}
+  .chart-box{height:150px;position:relative;}
+
+  .table-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;overflow-x:auto;}
+  .table-title{font-size:14px;font-weight:700;margin-bottom:14px;}
+  table.datatable{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12px;white-space:nowrap;}
+  table.datatable th, table.datatable td{padding:9px 12px;text-align:right;border-bottom:1px solid var(--border);}
+  table.datatable th:first-child, table.datatable td:first-child{text-align:left;}
+  table.datatable th{color:var(--text-dim);font-weight:600;position:sticky;top:0;background:var(--surface);}
+  table.datatable tbody tr:hover{background:var(--surface-2);}
+  table.datatable td.na{color:var(--text-faint);}
+
+  .chart-error-box{
+    text-align:center;padding:24px;color:var(--down);font-size:13px;line-height:1.6;
+    background:var(--surface-2);border:1px dashed rgba(246,120,158,0.35);border-radius:10px;
+  }
+
+  @media (max-width:960px){
+    .kpi-grid{grid-template-columns:repeat(3,1fr);}
+    .chart-grid{grid-template-columns:1fr 1fr;}
+  }
+  @media (max-width:640px){
+    .wrap{padding:28px 16px 48px;}
+    .kpi-grid{grid-template-columns:1fr 1fr;}
+    .chart-grid{grid-template-columns:1fr;}
+    header{align-items:flex-start;}
+    .meta-box{text-align:left;}
+    .refresh-row{justify-content:flex-start;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <nav class="pagenav">
+    <a href="./index.html">통합 매출</a>
+    <a href="./mobwith-a.html" class="active">Mobwith A 상세</a>
+    <a href="./mobwith-b.html">Mobwith B 지면별</a>
+  </nav>
+
+  <header>
+    <div>
+      <div class="eyebrow">Mobwith A · Daily Metrics</div>
+      <h1>Mobwith A 상세 지표</h1>
+      <div class="subtitle">노출수 · 클릭수 · CTR · CPC · 정산금액 · eCPM &nbsp;|&nbsp; <b id="dateRange">–</b></div>
+    </div>
+    <div>
+      <div class="meta-box">
+        원본: Mobwith A (Google Sheets)<span class="pill">Live</span><br/>
+        생성 시각: <span id="generatedAt">–</span>
+      </div>
+      <div class="refresh-row">
+        <span id="refreshIndicator"></span>
+        <button id="refreshBtn">지금 새로고침</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="controls-row">
+    <div class="period-label" id="periodLabel">기간: –</div>
+    <div class="controls">
+      <div class="seg" id="presetSeg">
+        <button data-preset="1" class="active">최근 1일</button>
+        <button data-preset="7">7일</button>
+        <button data-preset="14">14일</button>
+        <button data-preset="30">30일</button>
+        <button data-preset="all">전체</button>
+      </div>
+      <div class="date-range">
+        <input type="date" id="startInput" aria-label="시작일" />
+        <span>–</span>
+        <input type="date" id="endInput" aria-label="종료일" />
+      </div>
+    </div>
+  </div>
+
+  <section class="kpi-grid" id="kpiGrid"></section>
+
+  <section class="chart-grid" id="chartGrid"></section>
+
+  <section class="table-card">
+    <div class="table-title">일별 데이터</div>
+    <div id="tableWrap"><table class="datatable" id="dataTable"></table></div>
+  </section>
+
+</div>
+
+<script>
+const numFmt0 = new Intl.NumberFormat('ko-KR', {maximumFractionDigits:0});
+const numFmt1 = new Intl.NumberFormat('ko-KR', {maximumFractionDigits:1});
+const numFmt2 = new Intl.NumberFormat('ko-KR', {maximumFractionDigits:2});
+
+const METRICS = [
+  {key:'impressions', label:'노출수',     fmt: v => v==null?'–':numFmt0.format(v)},
+  {key:'clicks',      label:'클릭수',     fmt: v => v==null?'–':numFmt0.format(v)},
+  {key:'ctr',         label:'CTR',       fmt: v => v==null?'–':numFmt2.format(v*100)+'%'},
+  {key:'cpc',         label:'CPC',       fmt: v => v==null?'–':'₩'+numFmt0.format(v)},
+  {key:'revenue',     label:'정산금액',   fmt: v => v==null?'–':'₩'+numFmt0.format(v)},
+  {key:'ecpm',        label:'eCPM',      fmt: v => v==null?'–':'₩'+numFmt0.format(v)},
+];
+
+function shortDate(d){ return d.slice(5).replace('-', '/'); }
+function getVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+let PAYLOAD = null;
+let startIdx = 0, endIdx = 0, activePreset = '1';
+let charts = [];
+
+function clampIndices(){
+  const n = PAYLOAD.dates.length;
+  startIdx = Math.max(0, Math.min(startIdx, n - 1));
+  endIdx = Math.max(startIdx, Math.min(endIdx, n - 1));
+}
+
+function applyPreset(preset){
+  activePreset = preset;
+  const n = PAYLOAD.dates.length;
+  endIdx = n - 1;
+  startIdx = (preset === 'all') ? 0 : Math.max(0, n - parseInt(preset, 10));
+  clampIndices();
+  syncInputs();
+  renderAll();
+}
+
+function syncInputs(){
+  document.getElementById('startInput').value = PAYLOAD.dates[startIdx];
+  document.getElementById('endInput').value = PAYLOAD.dates[endIdx];
+  document.querySelectorAll('#presetSeg button').forEach(b => {
+    b.classList.toggle('active', b.dataset.preset === activePreset);
+  });
+}
+
+function onDateInputChange(){
+  const dates = PAYLOAD.dates;
+  const sVal = document.getElementById('startInput').value;
+  const eVal = document.getElementById('endInput').value;
+  let s = 0;
+  if (sVal){ s = dates.findIndex(d => d >= sVal); if (s === -1) s = dates.length - 1; }
+  let e = dates.length - 1;
+  if (eVal){ e = -1; for (let i = dates.length-1;i>=0;i--){ if (dates[i] <= eVal){ e=i; break; } } if (e===-1) e=0; }
+  if (s > e){ const t=s; s=e; e=t; }
+  startIdx = s; endIdx = e; activePreset = null;
+  clampIndices(); syncInputs(); renderAll();
+}
+
+// 기간 합계 → 여기서 CTR/CPC/eCPM을 다시 계산 (일별 비율의 단순평균이 아니라
+// 노출수·클릭수·정산금액의 합에서 도출한 가중평균이 되도록)
+function aggregate(startI, endI){
+  let imp=0, clk=0, rev=0, any=false;
+  for (let i=startI;i<=endI;i++){
+    if (PAYLOAD.impressions[i] != null){
+      imp += PAYLOAD.impressions[i]; clk += PAYLOAD.clicks[i]; rev += PAYLOAD.revenue[i]; any = true;
+    }
+  }
+  return {
+    impressions: any?imp:null, clicks: any?clk:null, revenue: any?rev:null,
+    ctr: imp ? clk/imp : null,
+    cpc: clk ? rev/clk : null,
+    ecpm: imp ? rev/imp*1000 : null,
+  };
+}
+
+function renderKpis(){
+  const agg = aggregate(startIdx, endIdx);
+  const box = document.getElementById('kpiGrid');
+  box.innerHTML = '';
+  METRICS.forEach(m => {
+    const card = document.createElement('div');
+    card.className = 'kpi-card';
+    const isRatio = m.key === 'ctr' || m.key === 'cpc' || m.key === 'ecpm';
+    card.innerHTML = `
+      <div class="kpi-label">${m.label}</div>
+      <div class="kpi-value">${m.fmt(agg[m.key])}</div>
+      <div class="kpi-unit">${isRatio ? '기간 가중평균' : '기간 합계'}</div>
+    `;
+    box.appendChild(card);
+  });
+
+  const n = endIdx - startIdx + 1;
+  document.getElementById('periodLabel').textContent =
+    `기간: ${PAYLOAD.dates[startIdx]} ~ ${PAYLOAD.dates[endIdx]} (${n}일)`;
+}
+
+function renderCharts(){
+  charts.forEach(c => c.destroy());
+  charts = [];
+  const grid = document.getElementById('chartGrid');
+  grid.innerHTML = '';
+
+  const dates = PAYLOAD.dates.slice(startIdx, endIdx + 1);
+  const labels = dates.map(shortDate);
+  const tickEvery = Math.max(1, Math.ceil(labels.length / 6));
+  const color = getVar('--c-metric');
+  // 기간이 아주 짧으면 점 1~3개짜리 선이 되어 추세로 읽히지 않으므로 막대로 표시한다.
+  const useBar = labels.length <= 3;
+
+  METRICS.forEach(m => {
+    const card = document.createElement('div');
+    card.className = 'chart-card';
+    card.innerHTML = `<div class="chart-title">${m.label}</div><div class="chart-box"><canvas></canvas></div>`;
+    grid.appendChild(card);
+
+    const values = PAYLOAD[m.key].slice(startIdx, endIdx + 1);
+    const ctx = card.querySelector('canvas').getContext('2d');
+    const gradient = ctx.createLinearGradient(0,0,0,150);
+    gradient.addColorStop(0, color + '33');
+    gradient.addColorStop(1, color + '00');
+
+    try {
+      const chart = new Chart(ctx, {
+        type: useBar ? 'bar' : 'line',
+        data: {
+          labels,
+          datasets: useBar ? [{
+            data: values, backgroundColor: color, borderRadius: 4, maxBarThickness: 56,
+          }] : [{
+            data: values, borderColor: color, backgroundColor: gradient, fill: true,
+            spanGaps: false, tension: 0.3, borderWidth: 2,
+            pointRadius: labels.length <= 20 ? 2 : 0, pointHoverRadius: 4,
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          interaction: {mode:'index', intersect:false},
+          plugins: {
+            legend: {display:false},
+            tooltip: {
+              backgroundColor:'#1e1e2c', borderColor:'#33334a', borderWidth:1,
+              titleFont:{family:"'JetBrains Mono',monospace", size:10.5},
+              bodyFont:{family:"'JetBrains Mono',monospace", size:10.5}, padding:9,
+              callbacks: {
+                title: (items) => dates[items[0].dataIndex],
+                label: (item) => item.parsed.y === null ? '데이터 없음' : m.fmt(item.parsed.y),
+              }
+            }
+          },
+          scales: {
+            x: {
+              grid:{display:false},
+              ticks:{color:'#54526a', font:{family:"'JetBrains Mono',monospace", size:8.5}, maxRotation:0, autoSkip:false,
+                callback: function(val, i){ return (i % tickEvery === 0 || i === labels.length-1) ? this.getLabelForValue(val) : ''; } },
+              border:{color:'#282836'},
+            },
+            y: {
+              grid:{color:'#20202c'},
+              ticks:{color:'#54526a', font:{family:"'JetBrains Mono',monospace", size:8.5},
+                callback: (v) => m.key==='ctr' ? (v*100).toFixed(1)+'%' : (Math.abs(v)>=10000 ? Math.round(v/1000)+'k' : numFmt0.format(v)) },
+              border:{display:false},
+            }
+          }
+        }
+      });
+      charts.push(chart);
+    } catch (err) {
+      card.querySelector('.chart-box').innerHTML =
+        `<div class="chart-error-box">차트 오류: ${err.message}</div>`;
+      console.error('chart render failed for', m.key, err);
+    }
+  });
+}
+
+function renderTable(){
+  const dates = PAYLOAD.dates.slice(startIdx, endIdx + 1);
+  let thead = '<thead><tr><th>날짜</th>' + METRICS.map(m => `<th>${m.label}</th>`).join('') + '</tr></thead>';
+  let rows = '';
+  for (let i = 0; i < dates.length; i++){
+    const idx = startIdx + i;
+    rows += '<tr><td>' + dates[i] + '</td>' + METRICS.map(m => {
+      const v = PAYLOAD[m.key][idx];
+      return `<td class="${v==null?'na':''}">${m.fmt(v)}</td>`;
+    }).join('') + '</tr>';
+  }
+  document.getElementById('dataTable').innerHTML = thead + '<tbody>' + rows + '</tbody>';
+}
+
+function renderAll(){
+  renderKpis();
+  renderCharts();
+  renderTable();
+}
+
+function init(payload){
+  PAYLOAD = payload;
+  if (!payload.dates.length){
+    document.getElementById('kpiGrid').innerHTML =
+      '<div style="color:var(--text-dim);font-size:13px;">표시할 데이터가 없습니다.</div>';
+    return;
+  }
+  document.getElementById('dateRange').textContent =
+    payload.dates[0].replace(/-/g,'.') + ' – ' + payload.dates[payload.dates.length-1].replace(/-/g,'.');
+  document.getElementById('generatedAt').textContent = payload.generatedAt;
+
+  const sIn = document.getElementById('startInput'), eIn = document.getElementById('endInput');
+  sIn.min = payload.dates[0]; sIn.max = payload.dates[payload.dates.length-1];
+  eIn.min = payload.dates[0]; eIn.max = payload.dates[payload.dates.length-1];
+
+  applyPreset('1');
+}
+
+function reinit(payload){
+  const prevPreset = activePreset;
+  const prevStart = PAYLOAD ? PAYLOAD.dates[startIdx] : null;
+  const prevEnd = PAYLOAD ? PAYLOAD.dates[endIdx] : null;
+  PAYLOAD = payload;
+  if (!payload.dates.length) return;
+
+  document.getElementById('dateRange').textContent =
+    payload.dates[0].replace(/-/g,'.') + ' – ' + payload.dates[payload.dates.length-1].replace(/-/g,'.');
+  document.getElementById('generatedAt').textContent = payload.generatedAt;
+
+  const sIn = document.getElementById('startInput'), eIn = document.getElementById('endInput');
+  sIn.min = payload.dates[0]; sIn.max = payload.dates[payload.dates.length-1];
+  eIn.min = payload.dates[0]; eIn.max = payload.dates[payload.dates.length-1];
+
+  if (prevPreset !== null){ applyPreset(prevPreset); return; }
+  let s = payload.dates.findIndex(d => d >= prevStart); if (s === -1) s = 0;
+  let e = -1; for (let i=payload.dates.length-1;i>=0;i--){ if (payload.dates[i] <= prevEnd){ e=i; break; } } if (e===-1) e=payload.dates.length-1;
+  startIdx = s; endIdx = e; clampIndices(); syncInputs(); renderAll();
+}
+
+document.getElementById('presetSeg').addEventListener('click', (ev) => {
+  const btn = ev.target.closest('button'); if (!btn) return; applyPreset(btn.dataset.preset);
+});
+document.getElementById('startInput').addEventListener('change', onDateInputChange);
+document.getElementById('endInput').addEventListener('change', onDateInputChange);
+
+function loadData(){
+  return fetch('./mobwith-a.json?t=' + Date.now(), {cache:'no-store'}).then(res => {
+    if (!res.ok) throw new Error('mobwith-a.json 요청 실패: HTTP ' + res.status);
+    return res.json();
+  });
+}
+
+loadData().then(init).catch(err => {
+  document.getElementById('kpiGrid').innerHTML =
+    `<div style="color:var(--down);font-size:13px;">데이터를 불러오지 못했습니다 (${err.message}).</div>`;
+  console.error('initial load failed:', err);
+});
+
+const REFRESH_MINUTES = 15;
+let refreshing = false;
+function refreshData(){
+  if (refreshing) return;
+  refreshing = true;
+  const indicator = document.getElementById('refreshIndicator');
+  indicator.textContent = '갱신 중…';
+  loadData().then(payload => { reinit(payload); indicator.textContent=''; refreshing=false; })
+    .catch(() => { indicator.textContent='갱신 실패'; refreshing=false; });
+}
+setInterval(refreshData, REFRESH_MINUTES * 60 * 1000);
+document.getElementById('refreshBtn').addEventListener('click', refreshData);
+</script>
+</body>
+</html>
