@@ -6,7 +6,7 @@ on:
   workflow_dispatch:        # 저장소의 Actions 탭에서 "Run workflow" 버튼으로 수동 실행도 가능
 
 permissions:
-  contents: write   # data.json을 다시 커밋/푸시하려면 필요
+  contents: write   # data.json 등을 다시 커밋/푸시하려면 필요
 
 jobs:
   refresh:
@@ -20,13 +20,13 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Fetch sheet data and rebuild data.json
+      - name: Fetch sheet data and rebuild data.json / mobwith-a.json / mobwith-b.json
         run: python scripts/refresh_data.py
 
-      - name: Commit updated data.json (변경된 경우에만)
+      - name: Commit updated JSON files (변경된 경우에만)
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data.json
+          git add data.json mobwith-a.json mobwith-b.json
           git diff --cached --quiet && echo "변경 사항 없음 — 커밋 생략" || git commit -m "데이터 자동 갱신 [skip ci]"
           git push
