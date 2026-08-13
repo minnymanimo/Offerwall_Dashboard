@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<base target="_top">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<script src="./vendor/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#0b0b11;
+    --surface:#15151f;
+    --surface-2:#1b1b28;
+    --border:#282836;
+    --text:#eceaf4;
+    --text-dim:#918fa3;
+    --text-faint:#54526a;
+    --accent:#8b6fff;
+    --accent-soft:rgba(139,111,255,0.14);
+    --c-metric:#60a5fa;
+    --up:#5ee6a4;
+    --down:#f6789e;
+    --mono:'JetBrains Mono','SF Mono',Consolas,'Courier New',monospace;
+    --sans:'Malgun Gothic','Apple SD Gothic Neo','Noto Sans KR',sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:
+      radial-gradient(ellipse 900px 500px at 15% -10%, rgba(139,111,255,0.10), transparent 60%),
+      var(--bg);
+    color:var(--text);
+    font-family:var(--sans);
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1180px;margin:0 auto;padding:40px 24px 64px;}
+
+  .pagenav{display:flex;gap:6px;margin-bottom:20px;}
+  .pagenav a{
+    font-family:var(--mono);font-size:11.5px;color:var(--text-dim);text-decoration:none;
+    background:var(--surface);border:1px solid var(--border);border-radius:8px;
+    padding:7px 14px;transition:border-color .12s ease, color .12s ease;
+  }
+  .pagenav a:hover{color:var(--text);border-color:var(--accent);}
+  .pagenav a.active{color:var(--accent);border-color:var(--accent);background:var(--accent-soft);font-weight:700;}
+
+  header{
+    display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:16px;
+    padding-bottom:22px;margin-bottom:24px;border-bottom:1px solid var(--border);
+  }
+  .eyebrow{
+    font-family:var(--mono);font-size:11px;letter-spacing:0.16em;color:var(--accent);
+    text-transform:uppercase;margin-bottom:10px;
+  }
+  h1{font-size:24px;font-weight:700;margin:0 0 6px;letter-spacing:-0.01em;}
+  .subtitle{font-size:13px;color:var(--text-dim);}
+  .subtitle b{color:var(--text);font-weight:600;}
+  .meta-box{font-family:var(--mono);font-size:11.5px;color:var(--text-dim);text-align:right;line-height:1.7;}
+  .meta-box .pill{
+    display:inline-block;padding:2px 8px;border-radius:20px;
+    background:var(--accent-soft);color:var(--accent);font-size:10.5px;margin-left:6px;
+  }
+  .refresh-row{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:4px;}
+  #refreshIndicator{font-size:10.5px;color:var(--accent);min-width:70px;text-align:right;}
+  #refreshBtn{
+    font-family:var(--mono);font-size:10.5px;color:var(--text-dim);
+    background:var(--surface);border:1px solid var(--border);border-radius:6px;
+    padding:3px 9px;cursor:pointer;
+  }
+  #refreshBtn:hover{color:var(--text);border-color:var(--accent);}
+
+  .rank-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:20px;}
+  .rank-head{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:14px;}
+  .rank-title{font-size:14px;font-weight:700;}
+  .metric-seg{display:flex;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;overflow:hidden;flex-wrap:wrap;}
+  .metric-seg button{
+    font-family:var(--mono);font-size:11px;color:var(--text-dim);
+    background:transparent;border:0;padding:6px 12px;cursor:pointer;border-right:1px solid var(--border);
+  }
+  .metric-seg button:last-child{border-right:0;}
+  .metric-seg button:hover{color:var(--text);}
+  .metric-seg button.active{background:var(--accent-soft);color:var(--accent);font-weight:700;}
+  .metric-seg button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px;}
+  .chart-box{height:420px;position:relative;}
+  .legend-row{display:flex;gap:14px;flex-wrap:wrap;font-family:var(--mono);font-size:10.5px;color:var(--text-dim);}
+  .legend-row span{display:inline-flex;align-items:center;gap:5px;}
+  .legend-row i{width:9px;height:9px;border-radius:50%;display:inline-block;}
+  .scatter-hint{font-size:11.5px;color:var(--text-faint);line-height:1.7;margin-bottom:14px;}
+
+  .table-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;overflow-x:auto;}
+  .table-title{font-size:14px;font-weight:700;margin-bottom:4px;}
+  .table-hint{font-size:11.5px;color:var(--text-faint);margin-bottom:14px;}
+  table.datatable{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12px;white-space:nowrap;}
+  table.datatable th, table.datatable td{padding:9px 12px;text-align:right;border-bottom:1px solid var(--border);}
+  table.datatable th:first-child, table.datatable td:first-child{text-align:left;white-space:normal;font-family:var(--sans);font-size:12.5px;}
+  table.datatable th{color:var(--text-dim);font-weight:600;cursor:pointer;user-select:none;}
+  table.datatable th:hover{color:var(--text);}
+  table.datatable th.sorted{color:var(--accent);}
+  table.datatable th .arrow{font-size:9px;margin-left:3px;}
+  table.datatable tbody tr:hover{background:var(--surface-2);}
+  table.heat{border-collapse:separate;border-spacing:2px;}
+  table.heat td{border-bottom:0;border-radius:4px;}
+  table.heat th{border-bottom:1px solid var(--border);}
+  .heat-legend{display:flex;align-items:center;gap:8px;margin-top:14px;font-size:10.5px;color:var(--text-faint);}
+  .heat-legend .ramp{width:110px;height:8px;border-radius:4px;display:inline-block;
+    background:linear-gradient(90deg,#1b1b28,#60a5fa);}
+
+  @media (max-width:640px){
+    .wrap{padding:28px 16px 48px;}
+    header{align-items:flex-start;}
+    .meta-box{text-align:left;}
+    .refresh-row{justify-content:flex-start;}
+    .chart-box{height:520px;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <nav class="pagenav">
+    <a href="./index.html">통합 매출</a>
+    <a href="./mobwith-a.html">Mobwith A 상세</a>
+    <a href="./mobwith-b.html" class="active">Mobwith B 지면별</a>
+  </nav>
+
+  <header>
+    <div>
+      <div class="eyebrow">Mobwith B · Placement Snapshot</div>
+      <h1>Mobwith B 지면별 현황</h1>
+      <div class="subtitle">지면(위치)별 노출수 · 클릭수 · CTR · CPC · 정산금액 · eCPM 비교 &nbsp;|&nbsp; <b id="placementCount">–</b>개 지면 &nbsp;|&nbsp; 집계 기간 <b id="periodLabel">–</b></div>
+    </div>
+    <div>
+      <div class="meta-box">
+        원본: Mobwith B (Google Sheets)<span class="pill">Live</span><br/>
+        생성 시각: <span id="generatedAt">–</span>
+      </div>
+      <div class="refresh-row">
+        <span id="refreshIndicator"></span>
+        <button id="refreshBtn">지금 새로고침</button>
+      </div>
+    </div>
+  </header>
+
+  <section class="rank-card">
+    <div class="rank-head">
+      <div class="rank-title">규모 × 효율 분포</div>
+      <div class="legend-row">
+        <span><i style="background:#5ee6a4"></i>규모·효율 모두 우수</span>
+        <span><i style="background:#f6b860"></i>규모 크나 효율 낮음</span>
+        <span><i style="background:#60a5fa"></i>효율 좋으나 규모 작음</span>
+        <span><i style="background:#6b6980"></i>둘 다 낮음</span>
+      </div>
+    </div>
+    <div class="scatter-hint">가로축 = 노출수(규모), 세로축 = eCPM(효율), 원 크기 = 매출 비중. 색 구분 기준은 각 축의 중앙값입니다. 오른쪽 위(초록)일수록 실제로 키울 가치가 큰 지면이고, 왼쪽 위(파랑)는 효율은 좋지만 물량이 작아 매출 기여가 미미한 지면입니다.</div>
+    <div class="chart-box"><canvas id="scatterCanvas"></canvas></div>
+  </section>
+
+  <section class="table-card">
+    <div class="table-title">지면별 지표 히트맵</div>
+    <div class="table-hint">색이 진할수록 해당 지표에서 상위권입니다. 열 제목을 클릭하면 정렬됩니다.</div>
+    <div id="tableWrap"><table class="datatable heat" id="dataTable"></table></div>
+    <div class="heat-legend">낮음<span class="ramp"></span>높음 (해당 지표 1위)</div>
+  </section>
+
+</div>
+
+<script>
+const numFmt0 = new Intl.NumberFormat('ko-KR', {maximumFractionDigits:0});
+const numFmt1 = new Intl.NumberFormat('ko-KR', {maximumFractionDigits:1});
+const numFmt2 = new Intl.NumberFormat('ko-KR', {maximumFractionDigits:2});
+
+const METRICS = [
+  {key:'name',        label:'지면명',    fmt: v => v, isNum:false},
+  {key:'impressions', label:'노출수',    fmt: v => v==null?'–':numFmt0.format(v), isNum:true},
+  {key:'clicks',      label:'클릭수',    fmt: v => v==null?'–':numFmt0.format(v), isNum:true},
+  {key:'ctr',         label:'CTR',      fmt: v => v==null?'–':numFmt2.format(v*100)+'%', isNum:true},
+  {key:'cpc',         label:'CPC',      fmt: v => v==null?'–':'₩'+numFmt0.format(v), isNum:true},
+  {key:'revenue',     label:'정산금액',  fmt: v => v==null?'–':'₩'+numFmt0.format(v), isNum:true},
+  {key:'revShare',    label:'매출비중',  fmt: v => v==null?'–':numFmt1.format(v*100)+'%', isNum:true},
+  {key:'ecpm',        label:'eCPM',     fmt: v => v==null?'–':'₩'+numFmt0.format(v), isNum:true},
+];
+const METRIC_BY_KEY = Object.fromEntries(METRICS.map(m => [m.key, m]));
+
+function getVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+let PAYLOAD = null;
+let scatterChart = null;
+let sortKey = 'revenue';
+let sortDir = 'desc'; // 'desc' | 'asc'
+
+function renderScatter(){
+  const ps = PAYLOAD.placements;
+  const totRev = ps.reduce((s,p) => s + (p.revenue||0), 0);
+  const medEcpm = (() => {
+    const v = ps.map(p => p.ecpm).filter(x => x!=null).sort((a,b)=>a-b);
+    return v.length ? v[Math.floor(v.length/2)] : 0;
+  })();
+  const medImp = (() => {
+    const v = ps.map(p => p.impressions).filter(x => x!=null).sort((a,b)=>a-b);
+    return v.length ? v[Math.floor(v.length/2)] : 0;
+  })();
+
+  const points = ps.map(p => ({
+    x: p.impressions, y: p.ecpm, r: Math.max(4, Math.sqrt((p.revenue/totRev)*100) * 4),
+    _p: p, _share: p.revenue/totRev,
+  }));
+
+  // 노출량(중앙값) × eCPM(중앙값) 기준 4분면으로 색을 나눔
+  const colors = points.map(pt => {
+    const hiVol = pt.x >= medImp, hiEff = pt.y >= medEcpm;
+    if (hiVol && hiEff) return '#5ee6a4';   // 규모도 크고 효율도 좋음
+    if (hiVol && !hiEff) return '#f6b860';  // 규모는 크나 효율 낮음
+    if (!hiVol && hiEff) return '#60a5fa';  // 효율은 좋으나 규모 작음
+    return '#6b6980';                        // 규모도 작고 효율도 낮음
+  });
+
+  if (scatterChart) scatterChart.destroy();
+  const ctx = document.getElementById('scatterCanvas').getContext('2d');
+  try {
+    scatterChart = new Chart(ctx, {
+      type: 'bubble',
+      data: { datasets: [{ data: points, backgroundColor: colors.map(c => c+'cc'), borderColor: colors, borderWidth:1 }] },
+      options: {
+        responsive:true, maintainAspectRatio:false,
+        plugins: {
+          legend: {display:false},
+          tooltip: {
+            backgroundColor:'#1e1e2c', borderColor:'#33334a', borderWidth:1,
+            titleFont:{family:"'Malgun Gothic',sans-serif", size:11.5},
+            bodyFont:{family:"'JetBrains Mono',monospace", size:11}, padding:10,
+            callbacks: {
+              title: (items) => items[0].raw._p.name,
+              label: (item) => {
+                const p = item.raw._p;
+                return ['노출수: ' + numFmt0.format(p.impressions),
+                        'eCPM: ₩' + numFmt0.format(p.ecpm),
+                        '매출: ₩' + numFmt0.format(p.revenue) + ' (' + numFmt1.format(item.raw._share*100) + '%)'];
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            type:'logarithmic',
+            title:{display:true, text:'노출수 (로그 축)', color:'#54526a', font:{size:10.5}},
+            grid:{color:'#20202c'},
+            ticks:{color:'#54526a', font:{family:"'JetBrains Mono',monospace", size:9},
+              callback:(v)=> Math.abs(v)>=1000 ? Math.round(v/1000)+'k' : v},
+            border:{color:'#282836'},
+          },
+          y: {
+            title:{display:true, text:'eCPM (원)', color:'#54526a', font:{size:10.5}},
+            grid:{color:'#20202c'},
+            ticks:{color:'#54526a', font:{family:"'JetBrains Mono',monospace", size:9}},
+            border:{display:false},
+          }
+        }
+      }
+    });
+  } catch (err) {
+    document.getElementById('scatterCanvas').outerHTML =
+      `<div style="text-align:center;padding:24px;color:var(--down);font-size:13px;">차트 오류: ${err.message}</div>`;
+    console.error('scatter render failed:', err);
+  }
+}
+
+function renderTable(){
+  const m = METRIC_BY_KEY[sortKey];
+  const rows = [...PAYLOAD.placements].sort((a,b) => {
+    const av = a[sortKey], bv = b[sortKey];
+    if (m.isNum) return sortDir==='desc' ? (bv||0)-(av||0) : (av||0)-(bv||0);
+    return sortDir==='desc' ? String(bv).localeCompare(String(av)) : String(av).localeCompare(String(bv));
+  });
+
+  // 지표마다 단위가 전혀 달라(원, 건수, %) 값 자체로는 색을 매길 수 없으므로,
+  // 각 지표 안에서의 순위를 0~100 백분위로 환산해 색 농도로 쓴다.
+  // 정렬 순서를 바꿔도 색은 그대로여야 하므로 항상 전체 지면 기준으로 계산한다.
+  const pctByKey = {};
+  METRICS.filter(x => x.isNum).forEach(x => {
+    const vals = PAYLOAD.placements.map(p => p[x.key]).filter(v => v != null).sort((a,b) => a-b);
+    const map = new Map();
+    PAYLOAD.placements.forEach(p => {
+      const v = p[x.key];
+      if (v == null) { map.set(p.name, null); return; }
+      map.set(p.name, vals.length > 1 ? (vals.indexOf(v) / (vals.length - 1)) * 100 : 100);
+    });
+    pctByKey[x.key] = map;
+  });
+
+  const thead = '<thead><tr>' + METRICS.map(m2 => {
+    const arrow = sortKey===m2.key ? `<span class="arrow">${sortDir==='desc'?'▼':'▲'}</span>` : '';
+    return `<th data-key="${m2.key}" class="${sortKey===m2.key?'sorted':''}">${m2.label}${arrow}</th>`;
+  }).join('') + '</tr></thead>';
+
+  const tbody = '<tbody>' + rows.map(p => {
+    return '<tr>' + METRICS.map(m2 => {
+      const v = p[m2.key];
+      if (!m2.isNum) return `<td>${m2.fmt(v)}</td>`;
+      const pct = pctByKey[m2.key].get(p.name);
+      if (pct == null) return `<td>${m2.fmt(v)}</td>`;
+      const t = pct / 100;
+      const r = Math.round(27 + 69*t), g = Math.round(27 + 138*t), b = Math.round(40 + 210*t);
+      const fg = pct >= 55 ? '#0b1420' : '#c7c5d6';
+      return `<td style="background:rgb(${r},${g},${b});color:${fg}">${m2.fmt(v)}</td>`;
+    }).join('') + '</tr>';
+  }).join('') + '</tbody>';
+
+  document.getElementById('dataTable').innerHTML = thead + tbody;
+
+  document.querySelectorAll('#dataTable th').forEach(th => {
+    th.addEventListener('click', () => {
+      const key = th.dataset.key;
+      if (sortKey === key) sortDir = sortDir === 'desc' ? 'asc' : 'desc';
+      else { sortKey = key; sortDir = 'desc'; }
+      renderTable();
+    });
+  });
+}
+
+function addDerived(payload){
+  const tot = payload.placements.reduce((s,p) => s + (p.revenue||0), 0);
+  payload.placements.forEach(p => { p.revShare = tot ? (p.revenue/tot) : null; });
+  return payload;
+}
+
+function init(payload){
+  PAYLOAD = addDerived(payload);
+  document.getElementById('generatedAt').textContent = payload.generatedAt;
+  document.getElementById('placementCount').textContent = payload.placements.length;
+  if (!payload.placements.length){
+    document.querySelector('.rank-card').innerHTML = '<div style="color:var(--text-dim);font-size:13px;">표시할 데이터가 없습니다.</div>';
+    document.querySelector('.table-card').style.display = 'none';
+    return;
+  }
+  renderScatter();
+  renderTable();
+}
+
+function reinit(payload){
+  PAYLOAD = addDerived(payload);
+  document.getElementById('generatedAt').textContent = payload.generatedAt;
+  document.getElementById('placementCount').textContent = payload.placements.length;
+  if (!payload.placements.length) return;
+  renderScatter();
+  renderTable();
+}
+
+function loadData(){
+  return fetch('./mobwith-b.json?t=' + Date.now(), {cache:'no-store'}).then(res => {
+    if (!res.ok) throw new Error('mobwith-b.json 요청 실패: HTTP ' + res.status);
+    return res.json();
+  });
+}
+
+// 이 시트에는 날짜 컬럼이 없지만, Mobwith A와 노출수·클릭수가 정확히 일치하는
+// 같은 데이터를 지면 단위로 자른 것이므로 A의 기간이 곧 이 표의 집계 기간이다.
+// 조회에 실패해도 본 화면은 그대로 동작해야 하므로 조용히 넘어간다.
+function loadPeriodLabel(){
+  fetch('./mobwith-a.json?t=' + Date.now(), {cache:'no-store'})
+    .then(res => res.ok ? res.json() : null)
+    .then(a => {
+      if (!a || !a.dates || !a.dates.length) return;
+      document.getElementById('periodLabel').textContent =
+        a.dates[0].replace(/-/g,'.') + ' – ' + a.dates[a.dates.length-1].replace(/-/g,'.');
+    })
+    .catch(() => {});
+}
+
+loadPeriodLabel();
+loadData().then(init).catch(err => {
+  document.querySelector('.rank-card').innerHTML =
+    `<div style="color:var(--down);font-size:13px;">데이터를 불러오지 못했습니다 (${err.message}).</div>`;
+  console.error('initial load failed:', err);
+});
+
+const REFRESH_MINUTES = 15;
+let refreshing = false;
+function refreshData(){
+  if (refreshing) return;
+  refreshing = true;
+  const indicator = document.getElementById('refreshIndicator');
+  indicator.textContent = '갱신 중…';
+  loadPeriodLabel();
+  loadData().then(payload => { reinit(payload); indicator.textContent=''; refreshing=false; })
+    .catch(() => { indicator.textContent='갱신 실패'; refreshing=false; });
+}
+setInterval(refreshData, REFRESH_MINUTES * 60 * 1000);
+document.getElementById('refreshBtn').addEventListener('click', refreshData);
+</script>
+</body>
+</html>
