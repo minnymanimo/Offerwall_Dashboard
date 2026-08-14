@@ -44,9 +44,12 @@ VENDOR_CONFIG = {
 MOBWITH_A_SHEET = 'Mobwith A'
 MOBWITH_A_COLS = {'date': '날 짜', 'impressions': '노출수', 'clicks': '클릭수', 'revenue': '정산금액'}
 
-# Mobwith B 지면별 스냅샷에서 쓰는 원본 컬럼명 (날짜 없이 지면명이 행 단위)
+# Mobwith B — 날짜×지면 구조 (2026-08-14 시트 개편: 지면별 스냅샷 -> 일자별 매트릭스)
 MOBWITH_B_SHEET = 'Mobwith B'
-MOBWITH_B_COLS = {'name': '지면명', 'impressions': '노출수', 'clicks': '클릭수', 'revenue': '정산금액'}
+MOBWITH_B_COLS = {
+    'date': '일자(Date)', 'id': 's값(Placement ID)', 'name': '지면명 (Placement Name)',
+    'os': 'OS (Platform)', 'impressions': '노출수', 'clicks': '클릭수', 'revenue': '정산금액',
+}
 
 # gviz 응답은 "google.visualization.Query.setResponse({...});" 형태의 JSONP 래퍼로 옴
 GVIZ_RESPONSE_RE = re.compile(r'^[^(]*\((.*)\);?\s*$', re.DOTALL)
@@ -203,27 +206,62 @@ def build_mobwith_a_payload(fetch_fn=None):
     }
 
 
+def clean_placement_name(n):
+    """'\xa0상세보기' 접미사(모비위드 리포트의 상세 링크 라벨) 제거."""
+    n = n.replace('\xa0', ' ').strip()
+    n = re.sub(r'\s*상세보기\s*$', '', n)
+    return n.strip()
+
+
 def build_mobwith_b_payload(fetch_fn=None):
-    """Mobwith B 지면별 스냅샷 — 날짜 축이 없는, 지면(행) 단위 집계."""
+    """Mobwith B — 일자×지면 매트릭스. s값(지면 ID)을 기준 키로 쓴다:
+    지면명 문자열은 날짜마다 '상세보기' 접미사 유무가 갈릴 수 있어 이름만으로
+    묶으면 같은 지면이 둘로 쪼개질 수 있다. 비율 지표(CTR/CPC/eCPM)는 여기서
+    계산하지 않고 원본(노출수/클릭수/정산금액)만 내보낸다 — 프론트에서 선택
+    기간에 맞게 합산 후 계산해야 정확하기 때문."""
     fetch_fn = fetch_fn or read_sheet_rows_by_cols
     rows = fetch_fn(MOBWITH_B_SHEET, MOBWITH_B_COLS)
 
-    placements = []
+    dates_set = set()
+    by_id = {}
     for r in rows:
-        name = r.get('name')
-        if not isinstance(name, str) or not name.strip():
-            continue
+        d = normalize_date(r.get('date'))
+        pid_raw = parse_gviz_value(r.get('id'))
         imp, clk, rev = _num_or_none(r.get('impressions')), _num_or_none(r.get('clicks')), _num_or_none(r.get('revenue'))
-        if imp is None or clk is None or rev is None:
+        if not d or pid_raw is None or imp is None or clk is None or rev is None:
             continue
+        try:
+            pid = int(pid_raw)
+        except (TypeError, ValueError):
+            continue
+        name_raw = r.get('name')
+        name = clean_placement_name(name_raw) if isinstance(name_raw, str) else str(pid)
+        os_raw = r.get('os')
+        os_val = os_raw if isinstance(os_raw, str) and os_raw.strip() else None
+
+        dates_set.add(d)
+        entry = by_id.setdefault(pid, {'id': pid, 'name': name, 'os': os_val, 'daily': {}})
+        entry['daily'][d] = (imp, clk, rev)  # 중복 date+id는 마지막 값으로 덮어씀
+        entry['name'] = name  # 최신 행의 이름/OS로 갱신 (표기 차이 흡수)
+        if os_val:
+            entry['os'] = os_val
+
+    if not dates_set:
+        return {'dates': [], 'placements': [], 'generatedAt': now_str()}
+
+    dates = build_date_range(min(dates_set), max(dates_set))
+    placements = []
+    for pid, e in by_id.items():
         placements.append({
-            'name': name.strip(),
-            'impressions': imp, 'clicks': clk, 'revenue': rev,
-            'ctr': (clk / imp) if imp else None,
-            'cpc': (rev / clk) if clk else None,
-            'ecpm': (rev / imp * 1000) if imp else None,
+            'id': pid, 'name': e['name'], 'os': e['os'],
+            'impressions': [e['daily'][d][0] if d in e['daily'] else None for d in dates],
+            'clicks': [e['daily'][d][1] if d in e['daily'] else None for d in dates],
+            'revenue': [e['daily'][d][2] if d in e['daily'] else None for d in dates],
         })
-    return {'placements': placements, 'generatedAt': now_str()}
+    placements.sort(key=lambda p: -sum(v for v in p['revenue'] if v is not None))
+
+    return {'dates': dates, 'placements': placements, 'generatedAt': now_str()}
+
 
 
 def build_date_range(start_s, end_s):
