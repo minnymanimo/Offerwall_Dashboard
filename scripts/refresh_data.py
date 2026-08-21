@@ -24,6 +24,7 @@ import urllib.error
 from datetime import date, datetime, timedelta
 
 SPREADSHEET_ID = '1k4HyjTk6SOAcL9KGcs1tka8s_t_7x9Knm8C5xBzu0Fc'
+
 FX_BASE = 'USD'
 FX_QUOTE = 'KRW'
 
@@ -38,6 +39,8 @@ VENDOR_CONFIG = {
                    'unit': 'mediaRevNo', 'unit_krw': 'mediaRevNo (원화 환산)', 'currency': 'USD'},
     'Mobwith A':  {'label': 'Mobwith A', 'date_col': '날 짜', 'value_col': '정산금액',
                    'unit': '정산금액 (원)', 'currency': 'KRW'},
+    'ADPOPCORN_Offerwall': {'label': 'ADPOPCORN 오퍼월', 'date_col': 'date', 'value_col': 'total_revenue',
+                            'unit': 'total_revenue (원, AOS+iOS 합산)', 'currency': 'KRW'},
 }
 
 # Mobwith A 상세 지표(일별)에서 쓰는 원본 컬럼명 — 정산금액은 VENDOR_CONFIG와 공유
@@ -322,6 +325,7 @@ def now_str():
 
 
 def build_payload(fetch_sheet_fn=read_vendor_series, fetch_fx_fn=fetch_usd_krw_rates):
+
     raw_by_vendor, all_dates = {}, set()
     for key, cfg in VENDOR_CONFIG.items():
         by_date = fetch_sheet_fn(key, cfg['date_col'], cfg['value_col'])
