@@ -9,7 +9,8 @@ JSON으로 정리하고, 정적 HTML 페이지들이 이를 읽어 GitHub Pages�
 | 파일 | 내용 |
 | --- | --- |
 | `index.html` | 통합 매출 — 5개 벤더(NBT 애디슨, Buzzvil, APCORN SSP, ADOP, Mobwith A)의 일별 매출 추이. 항목별 토글 칩에 선택 기간 합계·데이터 일수 표시, "합계" 선은 켜져 있는 항목만 합산 |
-| `mobwith.html` | Mobwith 상세 — 한 페이지에 두 구획. **A: 일별 지표**(노출수/클릭수/CTR/CPC/정산금액/eCPM 추이·기간 집계·표) + **B: 지면별 현황**(히트맵·규모×효율 분포, OS 필터, 지면명 클릭 시 일자별 표, 숫자 클릭 시 팝업 그래프). 두 구획은 기간 선택이 완전히 독립적이며 기본값은 둘 다 7일 |
+| `mobwith-a.html` | Mobwith A 상세 — 노출수/클릭수/CTR/CPC/정산금액/eCPM의 일별 추이와 기간 집계·표. 기간이 3일 이하면 막대, 그 이상이면 선 그래프 |
+| `mobwith-b.html` | Mobwith B 지면별 — 일자×지면 데이터를 히트맵·규모×효율 분포로. 히트맵과 분포도는 각각 독립된 OS(Android/iOS) 필터를 가짐. 지면명 클릭 시 일자별 표, 지표 숫자 클릭 시 그 지표만의 일자별 팝업 그래프(클릭 시에만 그려짐) |
 
 ## 동작 방식
 
@@ -30,16 +31,19 @@ JSON으로 정리하고, 정적 HTML 페이지들이 이를 읽어 GitHub Pages�
 - 저장소 설정 → Actions → General → Workflow permissions가
   **"Read and write permissions"**여야 JSON 자동 커밋이 동작합니다.
 
-## Mobwith A/B 통합 관련
+## ADPOPCORN 오퍼월 (신규 벤더)
 
-- 원래 `mobwith-a.html`·`mobwith-b.html` 두 페이지였던 것을 `mobwith.html` 하나로 합쳤습니다.
-  이유: 통합 매출 화면에 이미 Mobwith 전체 일 매출이 있어서, 별도 페이지로 하루 지표를
-  또 보여주는 게 중복이었습니다. 저장소에 예전 `mobwith-a.html`·`mobwith-b.html`이
-  남아있다면 삭제해도 됩니다(더 이상 워크플로우가 참조하지 않음).
-- A 구획은 선택 기간이 **하루**일 때 6개 미니 차트를 숨깁니다(KPI 카드·표와 완전히
-  같은 숫자를 반복하기 때문). 대신 KPI 카드에 **전일 대비 증감**을 표시합니다.
-- A 구획의 일별 표는 오래된 날짜가 위, 최신 날짜가 아래로 정렬되며 마지막 행에
-  "(최신)" 표기와 강조 배경이 들어갑니다.
+- 다른 벤더와 똑같은 방식입니다 — **기존 Apps Script 자동화**(`dailySync`)가
+  ADPOPCORN 오퍼월 리포트 API(AOS+iOS 두 토큰)를 매일 호출해 `ADPOPCORN_Offerwall`
+  시트 탭(date, aos_revenue, ios_revenue, total_revenue)에 써주고, 이 저장소의
+  `refresh_data.py`는 그 탭을 다른 5개 벤더처럼 읽기만 합니다. GitHub 쪽에는
+  토큰이 전혀 들어가지 않습니다(전에 API를 직접 호출하는 방식으로 잘못 만들었다가
+  Apps Script 쪽으로 옮겼습니다 — 토큰은 Apps Script 스크립트 속성에 보관).
+- `total_revenue`가 원화(KRW)라고 가정하고 그대로 표시합니다 — 실제로 확인된 값이
+  아니라 정황상 추정이라, 첫 실행 결과를 보고 이상하면 알려주세요.
+- API 응답 형태를 라이브로 검증하지 못한 채 작성돼서, Apps Script 쪽에 방어적
+  파싱과 실행 로그가 들어 있습니다. 자세한 내용은 Apps Script 프로젝트 상단
+  주석의 "[애드팝콘 오퍼월 관련 추가 참고]"를 확인해주세요.
 
 ## 데이터 관련 참고
 
