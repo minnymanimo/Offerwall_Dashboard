@@ -75,7 +75,16 @@
   #refreshBtn:hover{color:var(--text);border-color:var(--accent);}
 
   /* ---- KPI ---- */
-  .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:28px;}
+  .kpi-grid{margin-bottom:28px;}
+  .kpi-group{margin-bottom:22px;}
+  .kpi-group:last-child{margin-bottom:0;}
+  .kpi-group-header{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;
+    margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border);}
+  .kpi-group-title{font-family:var(--mono);font-size:12.5px;font-weight:700;color:var(--text);
+    letter-spacing:.06em;text-transform:uppercase;}
+  .kpi-group-total{font-family:var(--mono);font-size:13px;color:var(--text-dim);}
+  .kpi-group-note{color:var(--text-faint);font-size:10.5px;}
+  .kpi-group-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
   .kpi-card{
     background:var(--surface);border:1px solid var(--border);border-radius:14px;
     padding:18px 18px 16px;position:relative;overflow:hidden;
@@ -201,13 +210,13 @@
   .notes li b{color:var(--text);font-weight:600;}
 
   @media (max-width:860px){
-    .kpi-grid{grid-template-columns:1fr 1fr;}
+    .kpi-group-cards{grid-template-columns:1fr 1fr;}
     .chart-box{height:320px;}
     .trend-head{flex-direction:column;}
   }
   @media (max-width:520px){
     .wrap{padding:28px 16px 48px;}
-    .kpi-grid{grid-template-columns:1fr;}
+    .kpi-group-cards{grid-template-columns:1fr;}
     header{align-items:flex-start;}
     .meta-box{text-align:left;}
     .refresh-row{justify-content:flex-start;}
@@ -256,7 +265,8 @@
       </div>
       <div class="controls">
         <div class="seg" id="presetSeg">
-          <button data-preset="all" class="active">전체</button>
+          <button data-preset="mtd" class="active">이번 달</button>
+          <button data-preset="all">전체</button>
           <button data-preset="30">30일</button>
           <button data-preset="14">14일</button>
           <button data-preset="7">7일</button>
@@ -339,50 +349,80 @@ let activePreset = 'all';
 let seriesVisible = {};
 
 /* ---------- KPI ---------- */
+const GROUP_LABELS = { Offerwall: 'Offerwall', AdNetwork: 'AdNetwork' };
+const GROUP_ORDER = ['Offerwall', 'AdNetwork'];
+
 function renderKpis(){
   kpiGrid.innerHTML = '';
-  const {dates, vendors} = PAYLOAD;
+  const {vendors} = PAYLOAD;
 
-  Object.entries(vendors).forEach(([key, v]) => {
-    const color = colorMap[key];
-    const delta = (v.prevVal !== null && v.prevVal !== 0)
-      ? ((v.latestVal - v.prevVal) / Math.abs(v.prevVal)) * 100
-      : null;
-    const deltaHtml = delta === null
-      ? `<span>전일 대비 비교 불가</span>`
-      : `<span class="${delta >= 0 ? 'arrow-up' : 'arrow-down'}">${delta >= 0 ? '▲' : '▼'} ${Math.abs(delta).toFixed(1)}%</span><span>전일 대비</span>`;
+  GROUP_ORDER.forEach(groupKey => {
+    const entries = Object.entries(vendors).filter(([, v]) => v.group === groupKey);
+    if (!entries.length) return;
 
-    // 선택 기간 합계만 필터를 따름
-    let periodSum = 0, hasAny = false;
-    for (let i = startIdx; i <= endIdx; i++){
-      if (v.data[i] !== null){ periodSum += v.data[i]; hasAny = true; }
-    }
+    let groupTotal = 0, groupHasAny = false, groupSkippedUsd = false;
+    entries.forEach(([, v]) => {
+      // USD 변환이 실패해 원본 USD로 남아있는 벤더는 원화 합계에 섞을 수 없어 그룹
+      // 합계에서 제외하고, 그 사실을 표시한다(조용히 잘못된 합계를 보여주지 않기 위해).
+      if (v.currency === 'USD'){ groupSkippedUsd = true; return; }
+      for (let i = startIdx; i <= endIdx; i++){
+        if (v.data[i] !== null){ groupTotal += v.data[i]; groupHasAny = true; }
+      }
+    });
 
-    const sigGapDays = v.gaps
-      .filter(g => g[1] - g[0] >= 2)
-      .reduce((s,g) => s + (g[1]-g[0]+1), 0);
-    const warnHtml = sigGapDays > 0 ? `<div class="kpi-warn">⚠ 데이터 공백 ${sigGapDays}일</div>` : '';
-
-    const fxRefHtml = v.converted
-      ? `<div class="kpi-fx-ref">원본 $${numFmt2.format(v.latestValUsd)} · $1 ≈ ₩${fmt(v.fxRateAtLatest)}</div>`
-      : (v.currency === 'USD' ? `<div class="kpi-fx-ref">⚠ 환율 조회 실패 — USD 원본 표시</div>` : '');
-
-    const card = document.createElement('div');
-    card.className = 'kpi-card';
-    card.style.setProperty('--accent-bar', color);
-    card.innerHTML = `
-      <div class="kpi-top">
-        <div class="kpi-label">${v.label}</div>
-        <div class="kpi-dot"></div>
+    const groupWrap = document.createElement('div');
+    groupWrap.className = 'kpi-group';
+    groupWrap.innerHTML = `
+      <div class="kpi-group-header">
+        <span class="kpi-group-title">${GROUP_LABELS[groupKey]}</span>
+        <span class="kpi-group-total">선택 기간 합계 ${groupHasAny ? fmt(groupTotal) : '–'}${groupSkippedUsd ? ' <span class="kpi-group-note">(환율 미확보 벤더 제외)</span>' : ''}</span>
       </div>
-      <div class="kpi-value">${v.currency === 'USD' && !v.converted ? '$' : ''}${fmt(v.latestVal)}</div>
-      <div class="kpi-unit">${v.unit} · ${v.latestDate ? shortDate(v.latestDate)+' 기준' : '데이터 없음'}</div>
-      ${fxRefHtml}
-      <div class="kpi-delta">${deltaHtml}</div>
-      <div class="kpi-total">선택 기간 합계 ${hasAny ? fmt(periodSum) : '–'}</div>
-      ${warnHtml}
+      <div class="kpi-group-cards"></div>
     `;
-    kpiGrid.appendChild(card);
+    const cardsBox = groupWrap.querySelector('.kpi-group-cards');
+
+    entries.forEach(([key, v]) => {
+      const color = colorMap[key];
+      const delta = (v.prevVal !== null && v.prevVal !== 0)
+        ? ((v.latestVal - v.prevVal) / Math.abs(v.prevVal)) * 100
+        : null;
+      const deltaHtml = delta === null
+        ? `<span>전일 대비 비교 불가</span>`
+        : `<span class="${delta >= 0 ? 'arrow-up' : 'arrow-down'}">${delta >= 0 ? '▲' : '▼'} ${Math.abs(delta).toFixed(1)}%</span><span>전일 대비</span>`;
+
+      let periodSum = 0, hasAny = false;
+      for (let i = startIdx; i <= endIdx; i++){
+        if (v.data[i] !== null){ periodSum += v.data[i]; hasAny = true; }
+      }
+
+      const sigGapDays = v.gaps
+        .filter(g => g[1] - g[0] >= 2)
+        .reduce((s,g) => s + (g[1]-g[0]+1), 0);
+      const warnHtml = sigGapDays > 0 ? `<div class="kpi-warn">⚠ 데이터 공백 ${sigGapDays}일</div>` : '';
+
+      const fxRefHtml = v.converted
+        ? `<div class="kpi-fx-ref">원본 $${numFmt2.format(v.latestValUsd)} · $1 ≈ ₩${fmt(v.fxRateAtLatest)}</div>`
+        : (v.currency === 'USD' ? `<div class="kpi-fx-ref">⚠ 환율 조회 실패 — USD 원본 표시</div>` : '');
+
+      const card = document.createElement('div');
+      card.className = 'kpi-card';
+      card.style.setProperty('--accent-bar', color);
+      card.innerHTML = `
+        <div class="kpi-top">
+          <div class="kpi-label">${v.label}</div>
+          <div class="kpi-dot"></div>
+        </div>
+        <div class="kpi-value">${v.currency === 'USD' && !v.converted ? '$' : ''}${fmt(v.latestVal)}</div>
+        <div class="kpi-unit">${v.unit} · ${v.latestDate ? shortDate(v.latestDate)+' 기준' : '데이터 없음'}</div>
+        ${fxRefHtml}
+        <div class="kpi-delta">${deltaHtml}</div>
+        <div class="kpi-total">선택 기간 합계 ${hasAny ? fmt(periodSum) : '–'}</div>
+        ${warnHtml}
+      `;
+      cardsBox.appendChild(card);
+    });
+
+    kpiGrid.appendChild(groupWrap);
   });
 }
 
@@ -600,11 +640,29 @@ function clampIndices(){
   endIdx = Math.max(startIdx, Math.min(endIdx, n - 1));
 }
 
+// '이번 달' = 데이터상 가장 최신 날짜가 속한 달의 1일(또는 데이터 시작일) ~ 최신 날짜.
+// 실제 오늘 날짜가 아니라 데이터 기준으로 계산 — 수집이 하루이틀 밀려도 다른 프리셋들과
+// 기준이 어긋나지 않는다.
+function computeMtdRange(dates){
+  const n = dates.length;
+  const latestMonth = dates[n-1].slice(0, 7); // 'YYYY-MM'
+  let s = n - 1;
+  for (let i = n - 1; i >= 0; i--){
+    if (dates[i].slice(0, 7) === latestMonth) s = i; else break;
+  }
+  return [s, n - 1];
+}
+
 function applyPreset(preset){
   activePreset = preset;
   const n = PAYLOAD.dates.length;
-  endIdx = n - 1;
-  startIdx = (preset === 'all') ? 0 : Math.max(0, n - parseInt(preset, 10));
+  if (preset === 'mtd'){
+    const [s, e] = computeMtdRange(PAYLOAD.dates);
+    startIdx = s; endIdx = e;
+  } else {
+    endIdx = n - 1;
+    startIdx = (preset === 'all') ? 0 : Math.max(0, n - parseInt(preset, 10));
+  }
   clampIndices();
   syncInputs();
   renderAll();
@@ -665,12 +723,8 @@ function init(payload){
   sIn.min = dates[0]; sIn.max = dates[dates.length-1];
   eIn.min = dates[0]; eIn.max = dates[dates.length-1];
 
-  // 기본값 = 전체 기간
-  activePreset = 'all';
-  startIdx = 0;
-  endIdx = dates.length - 1;
-  syncInputs();
-  renderAll();
+  // 기본값 = 이번 달(데이터상 최신 날짜 기준)
+  applyPreset('mtd');
 }
 
 // 데이터만 교체될 때(자동 갱신) — 사용자가 고른 기간을 날짜 기준으로 최대한 유지
