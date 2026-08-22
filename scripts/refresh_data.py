@@ -29,18 +29,22 @@ FX_BASE = 'USD'
 FX_QUOTE = 'KRW'
 
 VENDOR_CONFIG = {
-    'NBT_Adison': {'label': 'NBT 애디슨', 'date_col': '날짜', 'value_col': '매출',
-                   'unit': '매출 (원)', 'currency': 'KRW'},
-    'Buzzvil':    {'label': 'Buzzvil', 'date_col': 'date', 'value_col': 'revenue',
-                   'unit': 'revenue', 'currency': 'KRW'},
-    'APCORN_SSP': {'label': 'APCORN SSP', 'date_col': 'date', 'value_col': 'media_cost',
-                   'unit': 'media_cost', 'unit_krw': 'media_cost (원화 환산)', 'currency': 'USD'},
-    'ADOP':       {'label': 'ADOP', 'date_col': 'date', 'value_col': 'mediaRevNo',
+    'NBT_Adison': {'label': 'NBT 애디슨', 'date_col': '날짜', 'group': 'Offerwall',
+                   'formula': {'type': 'subtract', 'cols': ['매출', '지급 리워드']},
+                   'unit': '매출 - 지급 리워드 (원)', 'currency': 'KRW'},
+    'Buzzvil':    {'label': 'Buzzvil', 'date_col': 'date', 'group': 'Offerwall',
+                   'formula': {'type': 'subtract', 'cols': ['revenue', 'cost']},
+                   'unit': 'revenue - cost', 'currency': 'KRW'},
+    'APCORN_SSP': {'label': 'APCORN SSP', 'date_col': 'date', 'group': 'AdNetwork',
+                   'formula': {'type': 'multiply', 'col': 'media_cost', 'factor': 0.8},
+                   'unit': 'media_cost × 80%', 'unit_krw': 'media_cost × 80% (원화 환산)', 'currency': 'USD'},
+    'ADOP':       {'label': 'ADOP(테크랩스)', 'date_col': 'date', 'value_col': 'mediaRevNo', 'group': 'AdNetwork',
                    'unit': 'mediaRevNo', 'unit_krw': 'mediaRevNo (원화 환산)', 'currency': 'USD'},
-    'Mobwith A':  {'label': 'Mobwith A', 'date_col': '날 짜', 'value_col': '정산금액',
+    'Mobwith A':  {'label': 'Mobwith A', 'date_col': '날 짜', 'value_col': '정산금액', 'group': 'AdNetwork',
                    'unit': '정산금액 (원)', 'currency': 'KRW'},
-    'ADPOPCORN_Offerwall': {'label': 'ADPOPCORN 오퍼월', 'date_col': 'date', 'value_col': 'total_revenue',
-                            'unit': 'total_revenue (원, AOS+iOS 합산)', 'currency': 'KRW'},
+    'ADPOPCORN_Offerwall': {'label': 'ADPOPCORN 오퍼월', 'date_col': 'date', 'group': 'Offerwall',
+                   'formula': {'type': 'multiply', 'col': 'total_revenue', 'factor': 0.6},
+                   'unit': 'total_revenue × 60%', 'currency': 'KRW'},
 }
 
 # Mobwith A 상세 지표(일별)에서 쓰는 원본 컬럼명 — 정산금액은 VENDOR_CONFIG와 공유
@@ -64,8 +68,17 @@ def http_get(url, timeout=30):
         return resp.read().decode('utf-8')
 
 
+_SHEET_CACHE = {}
+
+
 def fetch_sheet_rows(sheet_name):
-    """공개 gviz JSON 엔드포인트에서 시트 하나의 (컬럼 라벨, 행 데이터)를 가져옴."""
+    """공개 gviz JSON 엔드포인트에서 시트 하나의 (컬럼 라벨, 행 데이터)를 가져옴.
+
+    한 번 실행하는 동안 같은 시트를 두 번 이상 읽는 경우가 있어(예: Mobwith A는
+    통합 매출용과 상세 페이지용으로 각각 필요) 결과를 캐시해 네트워크 요청을 줄인다.
+    스크립트는 매 실행마다 새 프로세스로 뜨므로 캐시가 오래 남을 걱정은 없다."""
+    if sheet_name in _SHEET_CACHE:
+        return _SHEET_CACHE[sheet_name]
     url = ('https://docs.google.com/spreadsheets/d/{}/gviz/tq?'
            'tqx=out:json&headers=1&sheet={}').format(
         SPREADSHEET_ID, urllib.parse.quote(sheet_name))
@@ -83,6 +96,7 @@ def fetch_sheet_rows(sheet_name):
         while len(row) < len(cols):
             row.append(None)
         rows.append(row)
+    _SHEET_CACHE[sheet_name] = (cols, rows)
     return cols, rows
 
 
@@ -169,6 +183,40 @@ def _num_or_none(v):
     if isinstance(v, bool) or not isinstance(v, (int, float)):
         return None
     return float(v)
+
+
+def read_vendor_series_for_vendor(key, cfg):
+    """VENDOR_CONFIG 항목 하나를 읽어 {날짜: 값} 딕셔너리로 반환한다.
+
+    cfg에 'formula'가 있으면(뺄셈/곱셈) 필요한 컬럼을 전부 읽어 계산하고, 계산에
+    필요한 값 중 하나라도 비어 있으면 그 날짜는 아예 결과에서 뺀다(예: '지급 리워드'가
+    비어있는데 0으로 치면 매출이 실제보다 부풀려 보이므로) — 대시보드에는 그 날이
+    다른 날들과 마찬가지로 '데이터 없음(공백)'으로 나타난다.
+    formula가 없으면 기존처럼 단일 컬럼(value_col)을 그대로 읽는다."""
+    date_col = cfg['date_col']
+    if 'formula' not in cfg:
+        return read_vendor_series(key, date_col, cfg['value_col'])
+
+    formula = cfg['formula']
+    needed_cols = list(formula['cols']) if formula['type'] == 'subtract' else [formula['col']]
+    cols_map = {'__date__': date_col}
+    for c in needed_cols:
+        cols_map[c] = c
+    rows = read_sheet_rows_by_cols(key, cols_map)
+
+    by_date = {}
+    for r in rows:
+        d = normalize_date(r.get('__date__'))
+        if not d:
+            continue
+        vals = [_num_or_none(r.get(c)) for c in needed_cols]
+        if any(v is None for v in vals):
+            continue
+        if formula['type'] == 'subtract':
+            by_date[d] = vals[0] - vals[1]
+        else:  # multiply
+            by_date[d] = vals[0] * formula['factor']
+    return by_date
 
 
 def build_mobwith_a_payload(fetch_fn=None):
@@ -324,11 +372,11 @@ def now_str():
     return (datetime.utcnow() + timedelta(hours=9)).strftime('%Y-%m-%d %H:%M')  # KST
 
 
-def build_payload(fetch_sheet_fn=read_vendor_series, fetch_fx_fn=fetch_usd_krw_rates):
+def build_payload(fetch_sheet_fn=read_vendor_series_for_vendor, fetch_fx_fn=fetch_usd_krw_rates):
 
     raw_by_vendor, all_dates = {}, set()
     for key, cfg in VENDOR_CONFIG.items():
-        by_date = fetch_sheet_fn(key, cfg['date_col'], cfg['value_col'])
+        by_date = fetch_sheet_fn(key, cfg)
         raw_by_vendor[key] = by_date
         all_dates.update(by_date.keys())
 
@@ -363,6 +411,7 @@ def build_payload(fetch_sheet_fn=read_vendor_series, fetch_fx_fn=fetch_usd_krw_r
 
         vendors[key] = {
             'label': cfg['label'],
+            'group': cfg['group'],
             'unit': cfg.get('unit_krw') if converted else cfg['unit'],
             'currency': 'KRW' if converted else cfg['currency'],
             'converted': converted,
