@@ -266,6 +266,7 @@
       <div class="controls">
         <div class="seg" id="presetSeg">
           <button data-preset="mtd" class="active">이번 달</button>
+          <button data-preset="lastmonth">저번 달</button>
           <button data-preset="all">전체</button>
           <button data-preset="30">30일</button>
           <button data-preset="14">14일</button>
@@ -653,12 +654,31 @@ function computeMtdRange(dates){
   return [s, n - 1];
 }
 
+// '저번 달' = 데이터상 최신 날짜가 속한 달의 바로 전 달 전체(1일~말일). 그 달의
+// 데이터가 아예 없으면(예: 이번 달에 막 시작한 벤더) null을 반환한다.
+function computeLastMonthRange(dates){
+  const n = dates.length;
+  const [y, m] = dates[n-1].slice(0, 7).split('-').map(Number);
+  let py = y, pm = m - 1;
+  if (pm === 0){ pm = 12; py = y - 1; }
+  const prevYm = py + '-' + String(pm).padStart(2, '0');
+  let s = -1, e = -1;
+  for (let i = 0; i < n; i++){
+    if (dates[i].slice(0, 7) === prevYm){ if (s === -1) s = i; e = i; }
+  }
+  return s === -1 ? null : [s, e];
+}
+
 function applyPreset(preset){
   activePreset = preset;
   const n = PAYLOAD.dates.length;
   if (preset === 'mtd'){
     const [s, e] = computeMtdRange(PAYLOAD.dates);
     startIdx = s; endIdx = e;
+  } else if (preset === 'lastmonth'){
+    const range = computeLastMonthRange(PAYLOAD.dates);
+    if (range){ startIdx = range[0]; endIdx = range[1]; }
+    else { startIdx = 0; endIdx = 0; } // 저번 달 데이터가 아예 없으면 가장 이른 날 하루로 대체
   } else {
     endIdx = n - 1;
     startIdx = (preset === 'all') ? 0 : Math.max(0, n - parseInt(preset, 10));
