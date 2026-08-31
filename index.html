@@ -515,9 +515,12 @@ function renderSeriesToggles(datasets){
 }
 
 function setAllSeries(visible){
-  document.querySelectorAll('#seriesToggles .series-chip').forEach(btn => {
-    seriesVisible[btn.dataset.key] = visible;
-  });
+  // #seriesToggles에 실제로 그려진 칩만 훑으면 안 된다 — 합계 칩은 켜진 항목이
+  // 2개 이상일 때만 그려지는 조건부 요소라, "모두 숨김" 직후처럼 합계 칩이 잠깐
+  // DOM에서 사라진 상태일 때 "모두 표시"를 눌러도 합계의 숨김 상태가 안 풀렸다.
+  // 그래서 항상 벤더 전체 + 합계 키를 직접 지정해서 확실히 갱신한다.
+  Object.keys(PAYLOAD.vendors).forEach(k => { seriesVisible[k] = visible; });
+  seriesVisible[TOTAL_KEY] = visible;
   renderTrend();
 }
 
