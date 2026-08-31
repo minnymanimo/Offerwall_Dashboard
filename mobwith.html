@@ -289,6 +289,12 @@
   .modal-close:hover{color:var(--text);border-color:var(--accent);}
   #modalChartBox{height:260px;margin-top:16px;}
   table.heat td.clickable{cursor:pointer;}
+  .chg{font-weight:700;}
+  .chg.chg-up{color:var(--up);}
+  .chg.chg-down{color:var(--down);}
+  .chg.chg-flat{color:var(--text-faint);}
+  .chg-na{color:var(--text-faint);}
+  table.heat td.chg-cell{background:var(--surface-2);}
   table.heat td.clickable:hover{outline:1px solid var(--accent);outline-offset:-1px;}
 
   .mw-section-title{font-size:17px;font-weight:700;margin:36px 0 16px;padding-top:4px;}
@@ -447,6 +453,12 @@
 </div>
 
 <script>
+// 음수 KRW 값을 "-₩1,234"로 표기(부호가 화폐기호 뒤로 가는 걸 방지) — 두 구획이
+// 각자 다른 숫자 포맷터 변수를 쓰므로, 공유 헬퍼는 자체 포맷터를 따로 둔다.
+const _krwFmt = new Intl.NumberFormat('ko-KR', {maximumFractionDigits:0});
+function fmtKrwPlain(v){ return (v < 0 ? '-' : '') + '₩' + _krwFmt.format(Math.abs(v)); }
+function fmtKrw(v){ return v == null ? '–' : fmtKrwPlain(v); }
+
 const MobwithA = (function(){
 
 const numFmt0 = new Intl.NumberFormat('ko-KR', {maximumFractionDigits:0});
@@ -457,9 +469,9 @@ const METRICS = [
   {key:'impressions', label:'노출수',     fmt: v => v==null?'–':numFmt0.format(v)},
   {key:'clicks',      label:'클릭수',     fmt: v => v==null?'–':numFmt0.format(v)},
   {key:'ctr',         label:'CTR',       fmt: v => v==null?'–':numFmt2.format(v*100)+'%'},
-  {key:'cpc',         label:'CPC',       fmt: v => v==null?'–':'₩'+numFmt0.format(v)},
-  {key:'revenue',     label:'정산금액',   fmt: v => v==null?'–':'₩'+numFmt0.format(v)},
-  {key:'ecpm',        label:'eCPM',      fmt: v => v==null?'–':'₩'+numFmt0.format(v)},
+  {key:'cpc',         label:'CPC',       fmt: v => fmtKrw(v)},
+  {key:'revenue',     label:'정산금액',   fmt: v => fmtKrw(v)},
+  {key:'ecpm',        label:'eCPM',      fmt: v => fmtKrw(v)},
 ];
 
 function shortDate(d){ return d.slice(5).replace('-', '/'); }
@@ -747,13 +759,22 @@ const METRICS = [
   {key:'impressions',label:'노출수',fmt:v=>v==null?'–':f0.format(v)},
   {key:'clicks',label:'클릭수',fmt:v=>v==null?'–':f0.format(v)},
   {key:'ctr',label:'CTR',fmt:v=>v==null?'–':f2.format(v*100)+'%'},
-  {key:'cpc',label:'CPC',fmt:v=>v==null?'–':'\u20a9'+f0.format(v)},
-  {key:'revenue',label:'정산금액',fmt:v=>v==null?'–':'\u20a9'+f0.format(v)},
+  {key:'cpc',label:'CPC',fmt:v=>fmtKrw(v)},
+  {key:'revenue',label:'정산금액',fmt:v=>fmtKrw(v)},
+  {key:'revenueChange',label:'변화율',fmt:v=>fmtChange(v),isChange:true},
   {key:'revShare',label:'매출비중',fmt:v=>v==null?'–':f2.format(v*100)+'%'},
-  {key:'ecpm',label:'eCPM',fmt:v=>v==null?'–':'\u20a9'+f0.format(v)},
+  {key:'ecpm',label:'eCPM',fmt:v=>fmtKrw(v)},
+  {key:'ecpmChange',label:'변화율',fmt:v=>fmtChange(v),isChange:true},
 ];
+// 변화율 표기 — 미미한 변동(±3% 미만)은 회색으로 눌러서 시각적 노이즈를 줄인다.
+// null은 비교할 직전 7일이 없는 경우(데이터 14일 미만).
+function fmtChange(v){
+  if (v == null) return '<span class="chg-na">–</span>';
+  const cls = Math.abs(v) < 3 ? 'chg-flat' : (v > 0 ? 'chg-up' : 'chg-down');
+  return `<span class="chg ${cls}">${v > 0 ? '+' : ''}${v.toFixed(1)}%</span>`;
+}
 // 팝업 그래프 대상 지표만 (매출비중은 현재 필터 안에서의 상대값이라 일별로 쪼개면
-// 의미가 달라지므로 팝업 그래프 대상에서 제외)
+// 의미가 달라지므로 팝업 그래프 대상에서 제외. 변화율도 파생값이라 제외)
 const CHARTABLE = ['impressions','clicks','ctr','cpc','revenue','ecpm'];
 function getVar(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
 
@@ -789,7 +810,14 @@ function aggregate(osFilter){
   // 매출비중은 "현재 보이는 지면들" 안에서의 비중 — Android만 필터하면
   // Android 지면들끼리의 비중으로 다시 계산된다.
   const tot = rows.reduce((s,r)=>s+(r.revenue||0),0);
-  rows.forEach(r=>{ r.revShare = tot?( (r.revenue||0)/tot ):null; });
+  rows.forEach(r=>{
+    r.revShare = tot?( (r.revenue||0)/tot ):null;
+    // 변화율은 선택 기간과 무관하게 항상 최근 14일 기준(위 computeChangeRates 참고)
+    const p = DATA.placements.find(x => x.id === r.id);
+    const ch = p ? computeChangeRates(p) : {revenueChange:null, ecpmChange:null};
+    r.revenueChange = ch.revenueChange;
+    r.ecpmChange = ch.ecpmChange;
+  });
   return rows;
 }
 
@@ -971,6 +999,40 @@ function renderScatter(){
   }
 }
 
+// 정산금액·eCPM의 "최근 7일 vs 직전 7일" 변화율(%)을 지면별로 계산.
+// 7일씩 묶어서 비교하므로 하루짜리 노이즈에 흔들리지 않는다.
+// eCPM은 비율 지표라 각 7일 블록의 합계로 다시 계산해서 비교한다
+// (일별 eCPM 7개를 단순평균하면 노출량이 적은 날이 과대 반영되어 틀린 값이 나온다).
+// 데이터가 14일 미만이라 직전 7일을 확보할 수 없으면 null을 반환해 '–'로 표시된다.
+const CHANGE_WINDOW = 7;
+function computeChangeRates(placement){
+  const need = CHANGE_WINDOW * 2;
+  // 선택한 기간과 무관하게, 항상 데이터 전체의 마지막 14일을 기준으로 계산한다
+  // (기간 버튼을 바꿔도 변화율이 뒤집히지 않도록).
+  const n = DATA.dates.length;
+  if (n < need) return {revenueChange: null, ecpmChange: null};
+
+  function blockSums(fromIdx, toIdx){
+    let imp = 0, rev = 0, any = false;
+    for (let i = fromIdx; i <= toIdx; i++){
+      if (placement.revenue[i] == null || placement.impressions[i] == null) continue;
+      imp += placement.impressions[i];
+      rev += placement.revenue[i];
+      any = true;
+    }
+    return any ? {imp, rev} : null;
+  }
+  const recent = blockSums(n - CHANGE_WINDOW, n - 1);
+  const prev = blockSums(n - need, n - CHANGE_WINDOW - 1);
+  if (!recent || !prev) return {revenueChange: null, ecpmChange: null};
+
+  const revChange = prev.rev ? ((recent.rev / prev.rev) - 1) * 100 : null;
+  const recentEcpm = recent.imp ? recent.rev / recent.imp * 1000 : null;
+  const prevEcpm = prev.imp ? prev.rev / prev.imp * 1000 : null;
+  const ecpmChange = (recentEcpm != null && prevEcpm) ? ((recentEcpm / prevEcpm) - 1) * 100 : null;
+  return {revenueChange: revChange, ecpmChange: ecpmChange};
+}
+
 function renderHeat(){
   const rows=aggregate(osHeat);
   const pctByKey={};
@@ -985,8 +1047,18 @@ function renderHeat(){
     pctByKey[m.key]=map;
   });
 
+  const sortMeta = METRICS.find(m => m.key === sortKey);
+  const sortIsChange = !!(sortMeta && sortMeta.isChange);
   const sorted=[...rows].sort((a,b)=>{
-    const av=a[sortKey],bv=b[sortKey];
+    const av=a[sortKey], bv=b[sortKey];
+    // 변화율 열은 '가장 크게 움직인 순'이 목적이라 부호를 무시하고 절댓값으로 정렬한다.
+    // 비교할 직전 7일이 없어 null인 지면은 정렬 방향과 무관하게 항상 맨 아래로 보낸다.
+    if (sortIsChange){
+      if (av == null && bv == null) return 0;
+      if (av == null) return 1;
+      if (bv == null) return -1;
+      return sortDir==='desc' ? Math.abs(bv)-Math.abs(av) : Math.abs(av)-Math.abs(bv);
+    }
     return sortDir==='desc'?(bv||0)-(av||0):(av||0)-(bv||0);
   });
 
@@ -1005,7 +1077,11 @@ function renderHeat(){
     const isOpen = openId===r.id;
     h+=`<tr><td class="name-cell${isOpen?' open':''}" data-id="${r.id}"><span class="arrow">▶</span>${r.name}<span style="color:var(--text-faint);font-size:10px">(${r.os})</span></td>`;
     METRICS.filter(m=>m.key!=='name').forEach(m=>{
-      const v=r[m.key], pct=pctByKey[m.key].get(r.id);
+      const v=r[m.key];
+      // 변화율 열은 히트맵 색을 입히지 않는다 — 색은 '지면 간 절대값 순위'를 뜻하는데
+      // 변화율은 성격이 달라서 같은 색 규칙을 쓰면 오해를 부른다. 색 대신 자체 색상(초록/빨강)만 사용.
+      if (m.isChange){ h+=`<td class="chg-cell">${m.fmt(v)}</td>`; return; }
+      const pct=pctByKey[m.key].get(r.id);
       const clickable = CHARTABLE.includes(m.key) && v!=null;
       const cls = clickable ? ' class="clickable"' : '';
       const attrs = clickable ? ` data-id="${r.id}" data-metric="${m.key}"` : '';
@@ -1054,9 +1130,9 @@ function renderDrillRow(id){
       <td>${imp==null?'<span class="na">–</span>':f0.format(imp)}</td>
       <td>${clk==null?'<span class="na">–</span>':f0.format(clk)}</td>
       <td>${ctr==null?'<span class="na">–</span>':f2.format(ctr*100)+'%'}</td>
-      <td>${cpc==null?'<span class="na">–</span>':'\u20a9'+f0.format(cpc)}</td>
-      <td>${rev==null?'<span class="na">–</span>':'\u20a9'+f0.format(rev)}</td>
-      <td>${ecpm==null?'<span class="na">–</span>':'\u20a9'+f0.format(ecpm)}</td></tr>`;
+      <td>${cpc==null?'<span class="na">–</span>':fmtKrwPlain(cpc)}</td>
+      <td>${rev==null?'<span class="na">–</span>':fmtKrwPlain(rev)}</td>
+      <td>${ecpm==null?'<span class="na">–</span>':fmtKrwPlain(ecpm)}</td></tr>`;
   }
   // colspan은 지면명 1칸 + 지표 칸 수와 정확히 맞춰야 표가 어긋나지 않는다
   const colCount = 1 + METRICS.filter(m=>m.key!=='name').length;
