@@ -438,6 +438,7 @@
         <div class="seg" id="mwb-modalPresetSeg">
           <button data-p="1">최근 1일</button>
           <button data-p="7">7일</button>
+          <button data-p="14">14일</button>
           <button data-p="all">전체</button>
         </div>
         <div class="date-range">
@@ -456,7 +457,11 @@
 // 음수 KRW 값을 "-₩1,234"로 표기(부호가 화폐기호 뒤로 가는 걸 방지) — 두 구획이
 // 각자 다른 숫자 포맷터 변수를 쓰므로, 공유 헬퍼는 자체 포맷터를 따로 둔다.
 const _krwFmt = new Intl.NumberFormat('ko-KR', {maximumFractionDigits:0});
-function fmtKrwPlain(v){ return (v < 0 ? '-' : '') + '₩' + _krwFmt.format(Math.abs(v)); }
+function fmtKrwPlain(v){
+  const roundedAbs = Math.round(Math.abs(v));
+  const sign = (v < 0 && roundedAbs !== 0) ? '-' : '';
+  return sign + '₩' + _krwFmt.format(Math.abs(v));
+}
 function fmtKrw(v){ return v == null ? '–' : fmtKrwPlain(v); }
 
 const MobwithA = (function(){
@@ -1144,16 +1149,27 @@ function renderDrillRow(id){
 }
 
 /* ---------- 팝업: 지표 하나 클릭 시에만 해당 데이터로 그래프를 만든다 (지연 렌더링) ---------- */
+// 팝업 기본 기간 = 항상 최근 14일. 변화율이 '이번주 7일 vs 전주 7일'(=최근 14일) 비교라서,
+// 팝업을 열었을 때 그 비교의 근거가 된 기간을 그대로 보여주는 편이 자연스럽다.
+// 메인 화면에서 현재 어떤 기간 버튼을 눌러뒀는지와는 무관하게 항상 이 기본값을 쓴다.
+const MODAL_DEFAULT_PRESET = '14';
+function defaultModalRange(){
+  const n = DATA.dates.length;
+  const e = n - 1;
+  const s = Math.max(0, n - parseInt(MODAL_DEFAULT_PRESET, 10));
+  return [s, e];
+}
+
 function openModal(placementId, metricKey){
   const p = DATA.placements.find(x=>x.id===placementId);
   if(!p) return;
-  // 기본 기간 = 메인 화면에서 현재 선택된 기간. 팝업 안에서 독립적으로 바꿀 수 있다.
-  modalState = {placementId, metricKey, sI, eI};
+  const [defS, defE] = defaultModalRange();
+  modalState = {placementId, metricKey, sI: defS, eI: defE};
   const m = METRICS.find(x=>x.key===metricKey);
   document.getElementById('mwb-modalTitle').textContent = `${p.name} · ${m.label}`;
   document.getElementById('mwb-modalSub').textContent = `(${p.os})`;
   document.querySelectorAll('#mwb-modalPresetSeg button').forEach(b=>
-    b.classList.toggle('active', b.dataset.p===activePreset));
+    b.classList.toggle('active', b.dataset.p===MODAL_DEFAULT_PRESET));
   syncModalInputs();
   document.getElementById('mwb-modalBackdrop').classList.add('open');
   renderModalChart();
