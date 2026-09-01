@@ -433,6 +433,102 @@ def build_payload(fetch_sheet_fn=read_vendor_series_for_vendor, fetch_fx_fn=fetc
             'fxAvailable': fx_available, 'needsFx': needs_fx}
 
 
+APCORN_RAW_SHEET = 'APCORN_SSP_raw'
+APCORN_RAW_COLS = {
+    'date': 'report_date', 'pid': 'placement_id',
+    'impressions': 'impression_value', 'clicks': 'click_value', 'cost': 'media_cost',
+}
+APCORN_MAP_SHEET = 'APCORN_SSP_ID'
+APCORN_MAP_COLS = {'pid': 'Placement iD', 'name': '내용', 'os': 'OS'}
+
+
+def build_apcorn_ssp_payload(fetch_fn=None, fetch_fx_fn=None):
+    """APCORN SSP 지면별 일자 매트릭스.
+
+    raw 시트는 같은 (날짜, placement_id)가 report_type(광고 종류)별로 여러 행에
+    걸쳐 있으므로 전부 합산한다. request_value/response_value는 쓰지 않는다
+    (요청사항). report_type=1 행은 impression/click/media_cost가 모두 0이라
+    합산해도 영향이 없다.
+
+    media_cost는 USD라 통합 매출 화면과 동일하게 당일 환율로 원화 환산한다.
+
+    지면명·OS는 별도 매핑 시트(APCORN_SSP_ID)에서 placement_id로 찾아 붙인다.
+    매핑에 없는 지면도 절대 버리지 않고 '(미등록) <id>' 이름과 os='미지정'으로
+    그대로 집계에 포함한다 — 매핑을 깜빡해도 매출이 조용히 사라지지 않도록.
+    """
+    fetch_fn = fetch_fn or read_sheet_rows_by_cols
+    fetch_fx_fn = fetch_fx_fn or fetch_usd_krw_rates
+
+    name_by_pid, os_by_pid = {}, {}
+    for r in fetch_fn(APCORN_MAP_SHEET, APCORN_MAP_COLS):
+        pid = r.get('pid')
+        pid = str(pid).strip() if pid is not None else ''
+        if not pid:
+            continue
+        nm = r.get('name')
+        os_v = r.get('os')
+        if isinstance(nm, str) and nm.strip():
+            name_by_pid[pid] = nm.strip()
+        if isinstance(os_v, str) and os_v.strip():
+            os_by_pid[pid] = os_v.strip()
+
+    dates_set = set()
+    by_pid = {}
+    for r in fetch_fn(APCORN_RAW_SHEET, APCORN_RAW_COLS):
+        d = normalize_date(r.get('date'))
+        pid_raw = parse_gviz_value(r.get('pid'))
+        if not d or pid_raw is None:
+            continue
+        pid = str(pid_raw).strip()
+        if not pid:
+            continue
+        imp = _num_or_none(r.get('impressions')) or 0.0
+        clk = _num_or_none(r.get('clicks')) or 0.0
+        cost = _num_or_none(r.get('cost')) or 0.0
+
+        dates_set.add(d)
+        e = by_pid.setdefault(pid, {})
+        prev = e.get(d)
+        if prev:  # 같은 날짜의 다른 report_type 행 → 합산
+            prev[0] += imp; prev[1] += clk; prev[2] += cost
+        else:
+            e[d] = [imp, clk, cost]
+
+    if not dates_set:
+        return {'dates': [], 'placements': [], 'unmappedIds': [],
+                'fxAvailable': False, 'generatedAt': now_str()}
+
+    dates = build_date_range(min(dates_set), max(dates_set))
+    raw_rates = fetch_fx_fn(dates[0], dates[-1])
+    fx_available = bool(raw_rates)
+    rate_by_date = fill_rate_series(dates, raw_rates) if fx_available else {}
+
+    placements, unmapped = [], []
+    for pid, daily in by_pid.items():
+        mapped = pid in name_by_pid
+        if not mapped:
+            unmapped.append(pid)
+        imps, clks, revs = [], [], []
+        for d in dates:
+            v = daily.get(d)
+            if v is None:
+                imps.append(None); clks.append(None); revs.append(None); continue
+            imps.append(v[0]); clks.append(v[1])
+            rate = rate_by_date.get(d) if fx_available else None
+            revs.append(v[2] * rate if rate else (None if fx_available else v[2]))
+        placements.append({
+            'id': pid,
+            'name': name_by_pid.get(pid, '(미등록) ' + pid),
+            'os': os_by_pid.get(pid, '미지정'),
+            'mapped': mapped,
+            'impressions': imps, 'clicks': clks, 'revenue': revs,
+        })
+    placements.sort(key=lambda p: -sum(v for v in p['revenue'] if v is not None))
+
+    return {'dates': dates, 'placements': placements, 'unmappedIds': sorted(unmapped),
+            'fxAvailable': fx_available, 'generatedAt': now_str()}
+
+
 if __name__ == '__main__':
     payload = build_payload()
     with open('data.json', 'w', encoding='utf-8') as f:
@@ -449,3 +545,12 @@ if __name__ == '__main__':
     with open('mobwith-b.json', 'w', encoding='utf-8') as f:
         json.dump(mobwith_b, f, ensure_ascii=False)
     print('wrote mobwith-b.json: %d placements' % len(mobwith_b.get('placements', [])))
+
+    apcorn = build_apcorn_ssp_payload()
+    with open('apcorn-ssp.json', 'w', encoding='utf-8') as f:
+        json.dump(apcorn, f, ensure_ascii=False)
+    unmapped_n = len(apcorn.get('unmappedIds', []))
+    print('wrote apcorn-ssp.json: %d placements (%d unmapped)' % (
+        len(apcorn.get('placements', [])), unmapped_n))
+    if unmapped_n:
+        print('  ! 매핑 안 된 placement_id: %s' % ', '.join(apcorn['unmappedIds'][:10]))
