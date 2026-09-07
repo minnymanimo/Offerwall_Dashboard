@@ -23,6 +23,8 @@
     --c-mobwith-a:#60a5fa;
     --c-adpopcorn-ofw:#a3e635;
     --c-total:#eceaf4;
+    --c-grp-offerwall:#4ade80;
+    --c-grp-adnetwork:#38bdf8;
     --up:#5ee6a4;
     --down:#f6789e;
     --mono:'JetBrains Mono','SF Mono',Consolas,'Courier New',monospace;
@@ -265,6 +267,11 @@
         <div class="trend-sub" id="trendSub">–</div>
       </div>
       <div class="controls">
+        <div class="seg" id="viewModeSeg">
+          <button data-view="vendor" class="active">벤더별</button>
+          <button data-view="group">그룹별</button>
+          <button data-view="total">합계만</button>
+        </div>
         <div class="seg" id="presetSeg">
           <button data-preset="mtd" class="active">이번 달</button>
           <button data-preset="lastmonth">저번 달</button>
@@ -349,6 +356,8 @@ let scaleMode = 'linear';
 let activePreset = 'all';
 // 5개 계열(4개 벤더 + 합계)의 표시 여부 — 기간/축을 바꿔도 유지됨
 let seriesVisible = {};
+// 그래프 보기 방식: 'vendor'(벤더별 개별 선, 기본) | 'group'(Offerwall/AdNetwork 2선) | 'total'(합계선만)
+let viewMode = 'vendor';
 
 /* ---------- KPI ---------- */
 const GROUP_LABELS = { Offerwall: 'Offerwall', AdNetwork: 'AdNetwork' };
@@ -431,6 +440,8 @@ function renderKpis(){
 /* ---------- 통합 추이 차트 ---------- */
 const TOTAL_KEY = '__total__';
 
+const GROUP_KEY_PREFIX = '__group__';
+
 function buildDatasets(){
   const {dates, vendors} = PAYLOAD;
   const labels = dates.slice(startIdx, endIdx + 1);
@@ -439,6 +450,59 @@ function buildDatasets(){
   const krwKeys = Object.keys(vendors).filter(k => vendors[k].currency === 'KRW');
   const excluded = Object.keys(vendors).filter(k => vendors[k].currency !== 'KRW');
 
+  // 어떤 보기 방식이든 '칩으로 켜둔 벤더'만 합산 대상에 넣는다.
+  // 즉 칩은 '합계에 포함할지'를 뜻하고, 보기 방식은 '무엇을 선으로 그릴지'를 뜻한다.
+  const onKeys = krwKeys.filter(k => seriesVisible[k] !== false);
+
+  // 주어진 벤더 목록의 날짜별 합계 (모두 결측인 날은 null로 남겨 선을 끊는다)
+  const sumOf = keys => labels.map((_, i) => {
+    let s = null;
+    keys.forEach(key => {
+      const val = vendors[key].data[startIdx + i];
+      if (val !== null) s = (s === null ? 0 : s) + val;
+    });
+    return s;
+  });
+
+  const totalLine = (label, key, data, color, extra = {}) => Object.assign({
+    label, _key: key, data,
+    borderColor: color, backgroundColor: color,
+    spanGaps: false, tension: 0.3,
+    borderWidth: 2.4, pointRadius: 0, pointHoverRadius: 5,
+    hidden: seriesVisible[key] === false,
+    _usd: null,
+  }, extra);
+
+  if (viewMode === 'total'){
+    // 합계만 — 켜둔 벤더 전체를 더한 선 하나. 개별 벤더 선은 그리지 않는다.
+    const datasets = onKeys.length ? [
+      totalLine('합계 (' + onKeys.length + '개 항목)', TOTAL_KEY, sumOf(onKeys), getVar('--c-total'),
+        {_onCount: onKeys.length, borderWidth: 2.6})
+    ] : [];
+    return {labels, datasets, excluded};
+  }
+
+  if (viewMode === 'group'){
+    // 그룹별 — Offerwall / AdNetwork 두 선. 각 그룹 안에서 켜둔 벤더만 합산한다.
+    const datasets = [];
+    GROUP_ORDER.forEach(g => {
+      const keys = onKeys.filter(k => vendors[k].group === g);
+      if (!keys.length) return;
+      const key = GROUP_KEY_PREFIX + g;
+      datasets.push(totalLine(
+        GROUP_LABELS[g] + ' (' + keys.length + '개)', key, sumOf(keys),
+        getVar(g === 'Offerwall' ? '--c-grp-offerwall' : '--c-grp-adnetwork'),
+        {_onCount: keys.length}));
+    });
+    // 두 그룹이 다 있을 때만 전체 합계선을 함께 (한 그룹뿐이면 그 선과 겹쳐 무의미)
+    if (datasets.length > 1){
+      datasets.push(totalLine('합계', TOTAL_KEY, sumOf(onKeys), getVar('--c-total'),
+        {_onCount: onKeys.length, borderDash: [5,4], borderWidth: 1.5}));
+    }
+    return {labels, datasets, excluded};
+  }
+
+  // 벤더별(기본) — 지금까지의 동작 그대로
   const datasets = krwKeys.map(key => {
     const v = vendors[key];
     return {
@@ -459,32 +523,9 @@ function buildDatasets(){
 
   // 합계 = 현재 켜져 있는 항목만 더한 값. 켜진 항목이 1개 이하면 합계가 그 항목과
   // 완전히 겹쳐 무의미하므로 아예 만들지 않는다.
-  const onKeys = krwKeys.filter(k => seriesVisible[k] !== false);
   if (onKeys.length > 1){
-    const sum = labels.map((_, i) => {
-      let s = null;
-      onKeys.forEach(key => {
-        const val = vendors[key].data[startIdx + i];
-        if (val !== null) s = (s === null ? 0 : s) + val;
-      });
-      return s;
-    });
-    datasets.push({
-      label: '합계',
-      _key: TOTAL_KEY,
-      _onCount: onKeys.length,
-      data: sum,
-      borderColor: getVar('--c-total'),
-      backgroundColor: getVar('--c-total'),
-      borderDash: [5,4],
-      spanGaps: false,
-      tension: 0.3,
-      borderWidth: 1.5,
-      pointRadius: 0,
-      pointHoverRadius: 5,
-      hidden: seriesVisible[TOTAL_KEY] === false,
-      _usd: null,
-    });
+    datasets.push(totalLine('합계', TOTAL_KEY, sumOf(onKeys), getVar('--c-total'),
+      {_onCount: onKeys.length, borderDash: [5,4], borderWidth: 1.5}));
   }
 
   return {labels, datasets, excluded};
@@ -494,21 +535,42 @@ function buildDatasets(){
 function renderSeriesToggles(datasets){
   const box = document.getElementById('seriesToggles');
   box.innerHTML = '';
-  datasets.forEach(ds => {
-    const on = !ds.hidden;
+
+  // 칩은 항상 '벤더' 단위로 보여준다 — 보기 방식이 그룹별/합계만으로 바뀌어도
+  // 칩의 역할은 그대로 "이 벤더를 합산에 포함할지"이기 때문. (선으로 무엇을
+  // 그릴지는 보기 방식이 정하고, 무엇을 더할지는 칩이 정한다.)
+  const {vendors} = PAYLOAD;
+  const krwKeys = Object.keys(vendors).filter(k => vendors[k].currency === 'KRW');
+
+  const chips = krwKeys.map(key => {
+    const v = vendors[key];
+    return {key, label: v.label, color: colorMap[key],
+            data: v.data.slice(startIdx, endIdx + 1), isTotal: false};
+  });
+
+  // 합계 칩은 합계선이 '보조'로 그려지는 보기에서만. 합계만 보기에서는 합계선이
+  // 유일한 선이라, 칩으로 끄면 빈 차트가 되어버리므로 칩을 두지 않는다.
+  const totalDs = datasets.find(d => d._key === TOTAL_KEY);
+  if (totalDs && viewMode !== 'total'){
+    chips.push({key: TOTAL_KEY, label: '합계', color: totalDs.borderColor,
+                data: totalDs.data, isTotal: true, onCount: totalDs._onCount});
+  }
+
+  chips.forEach(c => {
+    const on = seriesVisible[c.key] !== false;
     // 데이터가 있는 날만 세어 둔다. 벤더마다 수집 시작일이 달라(예: Mobwith A는 8/1~)
     // 합계 금액만 나란히 보면 규모를 오해할 수 있기 때문.
     let sum = 0, days = 0;
-    ds.data.forEach(v => { if (v !== null && v !== undefined){ sum += v; days++; } });
+    c.data.forEach(v => { if (v !== null && v !== undefined){ sum += v; days++; } });
 
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.className = 'series-chip' + (ds._key === TOTAL_KEY ? ' is-dashed' : '');
-    btn.dataset.key = ds._key;
+    btn.className = 'series-chip' + (c.isTotal ? ' is-dashed' : '');
+    btn.dataset.key = c.key;
     btn.setAttribute('aria-pressed', String(on));
-    btn.style.setProperty('--chip-color', ds.borderColor);
-    const meta = ds._key === TOTAL_KEY ? `${ds._onCount}개 항목` : `${days}일`;
-    btn.innerHTML = `<span class="swatch"></span><span>${ds.label}</span>` +
+    btn.style.setProperty('--chip-color', c.color);
+    const meta = c.isTotal ? `${c.onCount}개 항목` : `${days}일`;
+    btn.innerHTML = `<span class="swatch"></span><span>${c.label}</span>` +
       `<span class="chip-sum">${days ? '₩' + numFmt0.format(sum) : '–'}</span>` +
       `<span class="chip-days">${meta}</span>`;
     box.appendChild(btn);
@@ -789,6 +851,15 @@ function reinit(payload){
 }
 
 /* ---------- 이벤트 ---------- */
+document.getElementById('viewModeSeg').addEventListener('click', (ev) => {
+  const btn = ev.target.closest('button');
+  if (!btn) return;
+  viewMode = btn.dataset.view;
+  document.querySelectorAll('#viewModeSeg button').forEach(b =>
+    b.classList.toggle('active', b === btn));
+  renderTrend();
+});
+
 document.getElementById('presetSeg').addEventListener('click', (ev) => {
   const btn = ev.target.closest('button');
   if (!btn) return;
