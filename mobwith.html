@@ -17,6 +17,7 @@
     --text-faint:#54526a;
     --accent:#8b6fff;
     --accent-soft:rgba(139,111,255,0.14);
+    --c-ssp:#38bdf8; --c-direct:#fbbf24;
     --c-metric:#60a5fa;
     --up:#5ee6a4;
     --down:#f6789e;
@@ -297,6 +298,28 @@
   table.heat td.chg-cell{background:var(--surface-2);}
   table.heat td.clickable:hover{outline:1px solid var(--accent);outline-offset:-1px;}
 
+  .sum3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:0 0 20px;}
+  .sum3 .sc{background:var(--surface-2);border:1px solid var(--border);border-radius:11px;padding:14px 16px;}
+  .sum3 .sc.hl{border-color:var(--accent);}
+  .sum3 .sc-l{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;margin-bottom:6px;
+    display:flex;align-items:center;gap:6px;color:var(--text-dim);}
+  .sum3 .sc-dot{width:8px;height:8px;border-radius:50%;display:inline-block;}
+  .sum3 .sc-v{font-size:19px;font-weight:700;letter-spacing:-.01em;}
+  .sum3 .sc-m{font-size:11px;color:var(--text-faint);margin-top:4px;}
+  @media (max-width:720px){ .sum3{grid-template-columns:1fr;} }
+
+  .reconcile-banner{background:rgba(246,120,158,.10);border:1px solid rgba(246,120,158,.45);
+    border-radius:10px;padding:11px 15px;font-size:12.5px;color:var(--text-dim);
+    margin-bottom:18px;line-height:1.8;}
+  .reconcile-banner b{color:var(--down);}
+  .reconcile-detail{font-family:var(--mono);font-size:11px;color:var(--text-faint);}
+
+  .stop-badge{display:inline-block;font-family:var(--mono);font-size:9.5px;
+    background:rgba(246,120,158,.16);color:var(--down);border-radius:4px;padding:1px 6px;margin-left:6px;}
+  .at-badge{display:inline-block;font-family:var(--mono);font-size:9.5px;border-radius:4px;padding:1px 6px;margin-left:5px;}
+  .at-badge.at-ssp{background:rgba(56,189,248,.16);color:var(--c-ssp);}
+  .at-badge.at-direct{background:rgba(251,191,36,.16);color:var(--c-direct);}
+
   .mw-section-title{font-size:17px;font-weight:700;margin:36px 0 16px;padding-top:4px;}
   .mw-section-title:first-of-type{margin-top:0;}
   .mw-section-sub{font-size:12px;color:var(--text-faint);margin:-12px 0 18px;line-height:1.6;}
@@ -330,13 +353,29 @@
     </div>
   </header>
 
-  <div class="mw-section-title">Mobwith A · 일별 지표</div>
-  <div class="mw-section-sub">기간은 아래 Mobwith B와 별개로 선택합니다.</div>
+  <div class="mw-section-title">Mobwith · 일별 지표</div>
+  <div class="mw-section-sub">기간은 아래 지면별 히트맵과 별개로 선택합니다.</div>
+
+  <div class="reconcile-banner" id="mwReconcile" style="display:none"></div>
+
+  <div class="sum3" id="mwaSum3">
+    <div class="sc"><div class="sc-l"><span class="sc-dot" style="background:var(--c-ssp)"></span><span style="color:var(--c-ssp)">SSP</span></div>
+      <div class="sc-v" id="sumSsp">–</div><div class="sc-m">통합매출에 반영되는 값</div></div>
+    <div class="sc"><div class="sc-l"><span class="sc-dot" style="background:var(--c-direct)"></span><span style="color:var(--c-direct)">직광고</span></div>
+      <div class="sc-v" id="sumDirect">–</div><div class="sc-m">통합매출에서는 제외</div></div>
+    <div class="sc hl"><div class="sc-l"><span class="sc-dot" style="background:var(--text)"></span>MOBWITH 전체</div>
+      <div class="sc-v" id="sumAll">–</div><div class="sc-m">SSP + 직광고</div></div>
+  </div>
 
 
   <div class="controls-row">
     <div class="period-label" id="mwa-periodLabel">기간: –</div>
     <div class="controls">
+      <div class="seg" id="mwaSeriesSeg">
+        <button data-s="all" class="active">전체</button>
+        <button data-s="ssp">SSP</button>
+        <button data-s="direct">직광고</button>
+      </div>
       <div class="seg" id="mwa-presetSeg">
         <button data-preset="1">최근 1일</button>
         <button data-preset="7" class="active">7일</button>
@@ -397,10 +436,13 @@
         <div class="card-title">지면별 지표 히트맵</div>
         <div class="card-sub">색은 <b style="color:var(--text-dim)">현재 필터·기간 안에서의</b> 순위(백분위)입니다. <b style="color:var(--text-dim)">지면명을 클릭하면</b> 일자별 표가 펼쳐지고, <b style="color:var(--text-dim)">숫자를 클릭하면</b> 그 지표의 일별 추이가 팝업으로 뜹니다.</div>
       </div>
-      <div class="seg" id="mwb-osSegHeat">
-        <button data-os="all" class="active">전체</button>
-        <button data-os="Android">Android</button>
-        <button data-os="IOS">iOS</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <div class="seg" id="mwbAdTypeSeg"></div>
+        <div class="seg" id="mwb-osSegHeat">
+          <button data-os="all" class="active">전체</button>
+          <button data-os="Android">Android</button>
+          <button data-os="IOS">iOS</button>
+        </div>
       </div>
     </div>
     <table class="heat" id="mwb-heatTable"></table>
@@ -526,11 +568,16 @@ function onDateInputChange(){
 
 // 기간 합계 → 여기서 CTR/CPC/eCPM을 다시 계산 (일별 비율의 단순평균이 아니라
 // 노출수·클릭수·정산금액의 합에서 도출한 가중평균이 되도록)
-function aggregate(startI, endI){
+// 현재 선택된 계열(전체/SSP/직광고). 데이터는 payload.series.{all|ssp|direct}에 들어있다.
+let activeSeries = 'all';
+function CUR(){ return PAYLOAD.series[activeSeries]; }
+
+function aggregate(startI, endI, seriesKey){
+  const S = seriesKey ? PAYLOAD.series[seriesKey] : CUR();
   let imp=0, clk=0, rev=0, any=false;
   for (let i=startI;i<=endI;i++){
-    if (PAYLOAD.impressions[i] != null){
-      imp += PAYLOAD.impressions[i]; clk += PAYLOAD.clicks[i]; rev += PAYLOAD.revenue[i]; any = true;
+    if (S.impressions[i] != null){
+      imp += S.impressions[i]; clk += S.clicks[i]; rev += S.revenue[i]; any = true;
     }
   }
   return {
@@ -602,7 +649,7 @@ function renderCharts(){
     card.innerHTML = `<div class="chart-title">${m.label}</div><div class="chart-box"><canvas></canvas></div>`;
     grid.appendChild(card);
 
-    const values = PAYLOAD[m.key].slice(startIdx, endIdx + 1);
+    const values = CUR()[m.key].slice(startIdx, endIdx + 1);
     const ctx = card.querySelector('canvas').getContext('2d');
     const gradient = ctx.createLinearGradient(0,0,0,150);
     gradient.addColorStop(0, color + '33');
@@ -671,7 +718,7 @@ function renderTable(){
   const rows = dates.map((d, i) => {
     const idx = startIdx + i;
     const row = {date: d};
-    METRICS.forEach(m => { row[m.key] = PAYLOAD[m.key][idx]; });
+    METRICS.forEach(m => { row[m.key] = CUR()[m.key][idx]; });
     return row;
   });
 
@@ -710,14 +757,37 @@ function renderTable(){
   });
 }
 
+function renderSummary3(){
+  // 세 계열의 '선택 기간' 정산금액 합계. 어떤 지표 토글을 골랐든 항상 셋 다 보인다.
+  [['ssp','sumSsp'],['direct','sumDirect'],['all','sumAll']].forEach(([k,id])=>{
+    const a = aggregate(startIdx, endIdx, k);
+    document.getElementById(id).textContent = a.revenue==null ? '–' : fmtKrwPlain(a.revenue);
+  });
+}
+
 function renderAll(){
+  renderSummary3();
   renderKpis();
   renderCharts();
   renderTable();
 }
 
+function renderReconcile(payload){
+  const el = document.getElementById('mwReconcile');
+  const items = payload.reconcile || [];
+  if (!items.length){ el.style.display='none'; return; }
+  el.style.display='';
+  const shown = items.slice(0,3).map(x =>
+    `${x.date} ${x.type}: 시트 ${fmtKrwPlain(x.sheet)} vs 히트맵 ${fmtKrwPlain(x.heatmap)} (차이 ${fmtKrwPlain(x.diff)})`
+  ).join('<br/>');
+  const more = items.length > 3 ? `<br/>… 외 ${items.length - 3}건` : '';
+  el.innerHTML = `<b>일별 시트(A·C)와 지면별 시트(B)의 합계가 어긋나는 날이 ${items.length}건 있습니다.</b> `
+    + `한쪽 수치가 잘못 입력됐을 수 있어요.<br/><span class="reconcile-detail">${shown}${more}</span>`;
+}
+
 function init(payload){
   PAYLOAD = payload;
+  renderReconcile(payload);
   if (!payload.dates.length){
     document.getElementById('mwa-kpiGrid').innerHTML =
       '<div style="color:var(--text-dim);font-size:13px;">표시할 데이터가 없습니다.</div>';
@@ -735,6 +805,7 @@ function reinit(payload){
   const prevStart = PAYLOAD ? PAYLOAD.dates[startIdx] : null;
   const prevEnd = PAYLOAD ? PAYLOAD.dates[endIdx] : null;
   PAYLOAD = payload;
+  renderReconcile(payload);
   if (!payload.dates.length) return;
 
   const sIn = document.getElementById('mwa-startInput'), eIn = document.getElementById('mwa-endInput');
@@ -749,6 +820,12 @@ function reinit(payload){
 
 document.getElementById('mwa-presetSeg').addEventListener('click', (ev) => {
   const btn = ev.target.closest('button'); if (!btn) return; applyPreset(btn.dataset.preset);
+});
+document.getElementById('mwaSeriesSeg').addEventListener('click', (ev) => {
+  const btn = ev.target.closest('button'); if (!btn) return;
+  activeSeries = btn.dataset.s;
+  document.querySelectorAll('#mwaSeriesSeg button').forEach(b => b.classList.toggle('active', b === btn));
+  renderAll();
 });
 document.getElementById('mwa-startInput').addEventListener('change', onDateInputChange);
 document.getElementById('mwa-endInput').addEventListener('change', onDateInputChange);
@@ -791,6 +868,28 @@ let sI=0, eI=0, activePreset='7';
 let sortKey='revenue', sortDir='desc';
 // 히트맵과 분포도는 서로 다른 용도로 쓰이므로 OS 필터를 각각 독립적으로 둔다.
 let osHeat='all', osScatter='all';
+// 광고유형 필터(히트맵·분포도 공유). 'all'이면 모든 유형을 합산한다.
+let adTypeFilter = 'all';
+// 지면 p의 i번째 날짜 값을, 현재 광고유형 필터 기준으로 합산해 돌려준다.
+// 유형별 배열 중 값이 하나라도 있으면 합산하고, 전부 결측이면 null(공백)을 유지한다.
+function cellOf(p, i){
+  const types = adTypeFilter === 'all' ? DATA.adTypes : [adTypeFilter];
+  let imp=0, clk=0, rev=0, any=false;
+  types.forEach(t => {
+    const bt = p.byType[t];
+    if (!bt) return;
+    if (bt.revenue[i] == null) return;
+    imp += bt.impressions[i]; clk += bt.clicks[i]; rev += bt.revenue[i]; any = true;
+  });
+  return any ? {imp, clk, rev} : null;
+}
+// 지면이 어떤 유형에서 매출이 있었는지 (전체 보기에서 배지로 표시)
+function typesWithRevenue(p){
+  return DATA.adTypes.filter(t => {
+    const bt = p.byType[t];
+    return bt && bt.revenue.some(v => v != null && v !== 0);
+  });
+}
 // 지면 선택 필터는 반대로 히트맵·분포도 양쪽에 공유로 적용한다(사용자 요청).
 // null = 전체 지면 표시, Set이면 그 안의 id만 표시.
 let placementFilter = null;
@@ -810,7 +909,8 @@ function aggregate(osFilter){
   const rows = src.map(p=>{
     let imp=0,clk=0,rev=0,any=false;
     for(let i=sI;i<=eI;i++){
-      if(p.impressions[i]!=null){imp+=p.impressions[i];clk+=p.clicks[i];rev+=p.revenue[i];any=true;}
+      const c=cellOf(p,i);
+      if(c){imp+=c.imp;clk+=c.clk;rev+=c.rev;any=true;}
     }
     return {id:p.id,name:p.name,os:p.os,
       impressions:any?imp:null, clicks:any?clk:null, revenue:any?rev:null,
@@ -1024,9 +1124,10 @@ function computeChangeRates(placement){
   function blockSums(fromIdx, toIdx){
     let imp = 0, rev = 0, any = false;
     for (let i = fromIdx; i <= toIdx; i++){
-      if (placement.revenue[i] == null || placement.impressions[i] == null) continue;
-      imp += placement.impressions[i];
-      rev += placement.revenue[i];
+      const c = cellOf(placement, i);
+      if (!c) continue;
+      imp += c.imp;
+      rev += c.rev;
       any = true;
     }
     return any ? {imp, rev} : null;
@@ -1098,7 +1199,17 @@ function renderHeat(){
 
   sorted.forEach(r=>{
     const isOpen = openId===r.id;
-    h+=`<tr><td class="name-cell${isOpen?' open':''}" data-id="${r.id}"><span class="arrow">▶</span>${r.name}<span style="color:var(--text-faint);font-size:10px">(${r.os})</span></td>`;
+    const pl = DATA.placements.find(x=>x.id===r.id);
+    // 전체 보기일 때만 유형 배지 (특정 유형만 볼 땐 이미 그 유형이라 중복 정보)
+    let badges = '';
+    if (pl && adTypeFilter === 'all'){
+      typesWithRevenue(pl).forEach(t => {
+        const cls = t === '직광고' ? 'at-direct' : 'at-ssp';
+        badges += `<span class="at-badge ${cls}">${t}</span>`;
+      });
+    }
+    if (pl && pl.stopped) badges += `<span class="stop-badge" title="${pl.lastDate} 이후 데이터가 없습니다">중지</span>`;
+    h+=`<tr><td class="name-cell${isOpen?' open':''}" data-id="${r.id}"><span class="arrow">▶</span>${r.name}<span style="color:var(--text-faint);font-size:10px">(${r.os})</span>${badges}</td>`;
     METRICS.filter(m=>m.key!=='name').forEach(m=>{
       const v=r[m.key];
       // 변화율 열은 히트맵 색을 입히지 않는다 — 색은 '지면 간 절대값 순위'를 뜻하는데
@@ -1147,7 +1258,8 @@ function renderDrillRow(id){
   const ds=periodDates(sI,eI);
   let rowsHtml='';
   for(let i=sI;i<=eI;i++){
-    const imp=p.impressions[i], clk=p.clicks[i], rev=p.revenue[i];
+    const c=cellOf(p,i);
+    const imp=c?c.imp:null, clk=c?c.clk:null, rev=c?c.rev:null;
     const ctr=imp?clk/imp:null, cpc=clk?rev/clk:null, ecpm=imp?rev/imp*1000:null;
     rowsHtml+=`<tr><td>${DATA.dates[i]}</td>
       <td>${imp==null?'<span class="na">–</span>':f0.format(imp)}</td>
@@ -1223,7 +1335,12 @@ function modalSeries(){
   const p = DATA.placements.find(x=>x.id===modalState.placementId);
   const {sI:ms, eI:me} = modalState;
   const dates = periodDates(ms,me);
-  const imp = p.impressions.slice(ms,me+1), clk = p.clicks.slice(ms,me+1), rev = p.revenue.slice(ms,me+1);
+  // 팝업 그래프도 현재 광고유형 필터를 그대로 따른다(히트맵에서 본 숫자와 일치하도록)
+  const imp=[], clk=[], rev=[];
+  for(let i=ms;i<=me;i++){
+    const c = cellOf(p, i);
+    imp.push(c?c.imp:null); clk.push(c?c.clk:null); rev.push(c?c.rev:null);
+  }
   let values;
   if(modalState.metricKey==='impressions') values = imp;
   else if(modalState.metricKey==='clicks') values = clk;
@@ -1276,6 +1393,25 @@ function renderModalChart(){
 document.getElementById('mwb-presetSeg').addEventListener('click',e=>{
   const b=e.target.closest('button'); if(!b)return; applyPreset(b.dataset.p);
 });
+// 광고유형 버튼은 시트에 실제로 등장한 값으로 만든다(유형이 늘어나면 자동 반영).
+function renderAdTypeSeg(){
+  const seg = document.getElementById('mwbAdTypeSeg');
+  const types = DATA.adTypes || [];
+  if (types.length < 2){ seg.style.display='none'; return; }  // 유형이 하나뿐이면 토글이 무의미
+  seg.style.display='';
+  seg.innerHTML = `<button data-at="all" class="${adTypeFilter==='all'?'active':''}">전체</button>` +
+    types.map(t=>`<button data-at="${t}" class="${adTypeFilter===t?'active':''}">${t}</button>`).join('');
+}
+
+document.getElementById('mwbAdTypeSeg').addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b)return;
+  adTypeFilter=b.dataset.at;
+  document.querySelectorAll('#mwbAdTypeSeg button').forEach(x=>x.classList.toggle('active',x===b));
+  openId=null;  // 유형이 바뀌면 펼쳐둔 일자별 표의 내용도 달라지므로 접는다
+  if (modalState) closeModal();
+  renderScatter(); renderHeat();
+});
+
 document.getElementById('mwb-osSegHeat').addEventListener('click',e=>{
   const b=e.target.closest('button'); if(!b)return; applyOsHeat(b.dataset.os);
 });
@@ -1315,6 +1451,7 @@ function initPage(payload){
   const msIn = document.getElementById('mwb-modalStartInput'), meIn = document.getElementById('mwb-modalEndInput');
   msIn.min = payload.dates[0]; msIn.max = payload.dates[payload.dates.length-1];
   meIn.min = payload.dates[0]; meIn.max = payload.dates[payload.dates.length-1];
+  renderAdTypeSeg();
   renderPlacementFilterList();
   openId=null;
   if (modalState) closeModal();
