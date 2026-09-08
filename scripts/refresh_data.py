@@ -486,7 +486,8 @@ def fill_rate_series(dates, rate_map):
 
 
 def now_str():
-    return (datetime.utcnow() + timedelta(hours=9)).strftime('%Y-%m-%d %H:%M')  # KST
+    from datetime import timezone
+    return (datetime.now(timezone.utc) + timedelta(hours=9)).strftime('%Y-%m-%d %H:%M')  # KST
 
 
 def build_payload(fetch_sheet_fn=read_vendor_series_for_vendor, fetch_fx_fn=fetch_usd_krw_rates):
@@ -671,8 +672,12 @@ if __name__ == '__main__':
     print('wrote mobwith-b.json: %d placements, 광고유형 %s, 중지 %d개' % (
         len(mobwith_b.get('placements', [])), mobwith_b.get('adTypes', []), stopped_n))
     if issues:
-        print('  ! A/C와 B 합계가 어긋나는 날 %d건 (예: %s)' % (
-            len(issues), issues[0]))
+        diffs = [abs(x['diff']) for x in issues]
+        print('  ! A/C와 B 합계가 어긋나는 날 %d건 (차이 최소 %.2f원 ~ 최대 %.2f원)' % (
+            len(issues), min(diffs), max(diffs)))
+        for x in sorted(issues, key=lambda x: -abs(x['diff'])):
+            print('     %s %-4s 시트=%s 히트맵=%s 차이=%s' % (
+                x['date'], x['type'], x['sheet'], x['heatmap'], x['diff']))
 
     apcorn = build_apcorn_ssp_payload()
     with open('apcorn-ssp.json', 'w', encoding='utf-8') as f:
