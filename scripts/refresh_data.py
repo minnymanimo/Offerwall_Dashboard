@@ -40,23 +40,28 @@ VENDOR_CONFIG = {
                    'unit': 'media_cost × 80%', 'unit_krw': 'media_cost × 80% (원화 환산)', 'currency': 'USD'},
     'ADOP':       {'label': 'ADOP(테크랩스)', 'date_col': 'date', 'value_col': 'mediaRevNo', 'group': 'AdNetwork',
                    'unit': 'mediaRevNo', 'unit_krw': 'mediaRevNo (원화 환산)', 'currency': 'USD'},
-    'Mobwith A':  {'label': 'Mobwith A', 'date_col': '날 짜', 'value_col': '정산금액', 'group': 'AdNetwork',
+    'Mobwith A':  {'label': 'Mobwith (SSP)', 'date_col': '날 짜', 'value_col': '정산금액', 'group': 'AdNetwork',
                    'unit': '정산금액 (원)', 'currency': 'KRW'},
     'ADPOPCORN_Offerwall': {'label': 'ADPOPCORN 오퍼월', 'date_col': 'date', 'group': 'Offerwall',
                    'formula': {'type': 'multiply', 'col': 'total_revenue', 'factor': 0.6},
                    'unit': 'total_revenue × 60%', 'currency': 'KRW'},
 }
 
-# Mobwith A 상세 지표(일별)에서 쓰는 원본 컬럼명 — 정산금액은 VENDOR_CONFIG와 공유
+# Mobwith A/C 상세 지표(일별). 2026-09 개편: A는 SSP만, C는 직광고만 담는다.
+# (원래 A에 합쳐져 있던 직광고 수치를 C로 분리) 두 시트는 컬럼 구조가 동일하다.
 MOBWITH_A_SHEET = 'Mobwith A'
+MOBWITH_C_SHEET = 'Mobwith C'
 MOBWITH_A_COLS = {'date': '날 짜', 'impressions': '노출수', 'clicks': '클릭수', 'revenue': '정산금액'}
 
-# Mobwith B — 날짜×지면 구조 (2026-08-14 시트 개편: 지면별 스냅샷 -> 일자별 매트릭스)
+# Mobwith B — 날짜×지면 구조. 2026-09 개편으로 '광고유형'(SSP/직광고) 컬럼이 추가됨.
 MOBWITH_B_SHEET = 'Mobwith B'
 MOBWITH_B_COLS = {
     'date': '일자(Date)', 'id': 's값(Placement ID)', 'name': '지면명 (Placement Name)',
-    'os': 'OS (Platform)', 'impressions': '노출수', 'clicks': '클릭수', 'revenue': '정산금액',
+    'os': 'OS (Platform)', 'adtype': '광고유형',
+    'impressions': '노출수', 'clicks': '클릭수', 'revenue': '정산금액',
 }
+# 대조 허용 오차(원). 수기 이관·반올림에서 오는 1원 미만 차이는 경고하지 않는다.
+RECONCILE_TOLERANCE = 1.0
 
 # gviz 응답은 "google.visualization.Query.setResponse({...});" 형태의 JSONP 래퍼로 옴
 GVIZ_RESPONSE_RE = re.compile(r'^[^(]*\((.*)\);?\s*$', re.DOTALL)
@@ -219,40 +224,72 @@ def read_vendor_series_for_vendor(key, cfg):
     return by_date
 
 
-def build_mobwith_a_payload(fetch_fn=None):
-    """Mobwith A 일별 상세 지표: 노출수/클릭수/정산금액(원본) + CTR/CPC/eCPM(파생값).
-    비율 지표는 항상 노출수·클릭수·정산금액의 합에서 계산해, 기간 평균을 낼 때도
-    '일별 비율의 단순평균'이 아니라 올바른 가중평균이 되도록 프론트에서 재사용한다."""
-    fetch_fn = fetch_fn or read_sheet_rows_by_cols
-    rows = fetch_fn(MOBWITH_A_SHEET, MOBWITH_A_COLS)
-
+def _read_daily_sheet(sheet_name, fetch_fn):
+    """A/C처럼 '날짜별 1행' 구조인 시트를 {날짜: (노출,클릭,정산)}으로 읽는다."""
     by_date = {}
-    for r in rows:
+    for r in fetch_fn(sheet_name, MOBWITH_A_COLS):
         d = normalize_date(r.get('date'))
-        imp, clk, rev = _num_or_none(r.get('impressions')), _num_or_none(r.get('clicks')), _num_or_none(r.get('revenue'))
+        imp = _num_or_none(r.get('impressions'))
+        clk = _num_or_none(r.get('clicks'))
+        rev = _num_or_none(r.get('revenue'))
         if not d or imp is None or clk is None or rev is None:
             continue
         by_date[d] = (imp, clk, rev)  # 중복 날짜는 마지막 값으로 덮어씀
+    return by_date
 
-    if not by_date:
-        return {'dates': [], 'impressions': [], 'clicks': [], 'revenue': [],
-                'ctr': [], 'cpc': [], 'ecpm': [], 'gaps': [], 'generatedAt': now_str()}
 
-    date_keys = sorted(by_date.keys())
-    dates = build_date_range(date_keys[0], date_keys[-1])
+def _series_from(by_date, dates):
+    """날짜축에 맞춰 시계열로 펼치고 비율 지표를 파생한다.
+    비율은 항상 노출·클릭·정산의 합에서 계산해, 프론트에서 기간 가중평균을 낼 때도
+    '일별 비율의 단순평균'이 되지 않도록 한다."""
+    imp = [by_date[d][0] if d in by_date else None for d in dates]
+    clk = [by_date[d][1] if d in by_date else None for d in dates]
+    rev = [by_date[d][2] if d in by_date else None for d in dates]
+    return {
+        'impressions': imp, 'clicks': clk, 'revenue': rev,
+        'ctr':  [(c / i) if i else None for i, c in zip(imp, clk)],
+        'cpc':  [(r / c) if c else None for c, r in zip(clk, rev)],
+        'ecpm': [(r / i * 1000) if i else None for i, r in zip(imp, rev)],
+        'gaps': find_gaps(rev),
+    }
 
-    impressions = [by_date[d][0] if d in by_date else None for d in dates]
-    clicks = [by_date[d][1] if d in by_date else None for d in dates]
-    revenue = [by_date[d][2] if d in by_date else None for d in dates]
-    ctr = [(c / i) if (i) else None for i, c in zip(impressions, clicks)]
-    cpc = [(r / c) if (c) else None for c, r in zip(clicks, revenue)]
-    ecpm = [(r / i * 1000) if (i) else None for i, r in zip(impressions, revenue)]
+
+def build_mobwith_daily_payload(fetch_fn=None):
+    """Mobwith 일별 지표를 SSP(A) / 직광고(C) / 전체(A+C) 세 벌로 만든다.
+
+    통합 매출 대시보드에는 SSP만 반영되지만(직광고는 애드네트워크 매출이 아니므로),
+    Mobwith 상세 화면에서는 셋 다 보여주기 위해 한 파일에 담는다.
+    전체는 두 시트를 날짜별로 더해서 만들며, 한쪽만 값이 있는 날은 그 값만 쓴다
+    (양쪽 다 없는 날만 공백)."""
+    fetch_fn = fetch_fn or read_sheet_rows_by_cols
+    ssp_by_date = _read_daily_sheet(MOBWITH_A_SHEET, fetch_fn)
+    dir_by_date = _read_daily_sheet(MOBWITH_C_SHEET, fetch_fn)
+
+    all_keys = sorted(set(ssp_by_date) | set(dir_by_date))
+    if not all_keys:
+        empty = {'impressions': [], 'clicks': [], 'revenue': [],
+                 'ctr': [], 'cpc': [], 'ecpm': [], 'gaps': []}
+        return {'dates': [], 'series': {'ssp': dict(empty), 'direct': dict(empty), 'all': dict(empty)},
+                'generatedAt': now_str()}
+
+    dates = build_date_range(all_keys[0], all_keys[-1])
+
+    combined = {}
+    for d in dates:
+        a, c = ssp_by_date.get(d), dir_by_date.get(d)
+        if a is None and c is None:
+            continue
+        a = a or (0.0, 0.0, 0.0)
+        c = c or (0.0, 0.0, 0.0)
+        combined[d] = (a[0] + c[0], a[1] + c[1], a[2] + c[2])
 
     return {
         'dates': dates,
-        'impressions': impressions, 'clicks': clicks, 'revenue': revenue,
-        'ctr': ctr, 'cpc': cpc, 'ecpm': ecpm,
-        'gaps': find_gaps(revenue),
+        'series': {
+            'ssp': _series_from(ssp_by_date, dates),
+            'direct': _series_from(dir_by_date, dates),
+            'all': _series_from(combined, dates),
+        },
         'generatedAt': now_str(),
     }
 
@@ -265,54 +302,134 @@ def clean_placement_name(n):
 
 
 def build_mobwith_b_payload(fetch_fn=None):
-    """Mobwith B — 일자×지면 매트릭스. s값(지면 ID)을 기준 키로 쓴다:
-    지면명 문자열은 날짜마다 '상세보기' 접미사 유무가 갈릴 수 있어 이름만으로
-    묶으면 같은 지면이 둘로 쪼개질 수 있다. 비율 지표(CTR/CPC/eCPM)는 여기서
-    계산하지 않고 원본(노출수/클릭수/정산금액)만 내보낸다 — 프론트에서 선택
-    기간에 맞게 합산 후 계산해야 정확하기 때문."""
+    """Mobwith B — 일자 x 지면 x 광고유형(SSP/직광고) 매트릭스.
+
+    [빠진 row를 0으로 채우는 규칙]
+    시트에는 "값이 전부 0인 날은 row를 아예 안 만든" 구간이 있다(8월). 이걸 그냥
+    결측으로 두면 실제로는 0원인 날이 '데이터 없음'이 되어 그래프가 끊기고 변화율
+    계산에서도 빠진다. 그렇다고 무조건 0으로 채우면 이번엔 '중지된 지면'이 영원히
+    0원 행으로 남는다. 그래서 지면마다 활동 구간(첫 row 날짜 ~ 마지막 row 날짜)을
+    잡고, 그 안에서만 빠진 (날짜 x 광고유형)을 0으로 채운다. 구간 밖(시작 전/중지 후)은
+    공백으로 남긴다. 단 그 날짜가 시트에 통째로 없으면(수집 실패) 구간 안이어도
+    공백을 유지한다 — 수집 실패를 0원으로 둔갑시키지 않기 위해.
+
+    광고유형 값은 하드코딩하지 않고 시트에 등장한 값을 그대로 쓴다(나중에 유형이
+    늘어나면 시트만 고쳐도 화면에 반영되도록).
+    """
     fetch_fn = fetch_fn or read_sheet_rows_by_cols
     rows = fetch_fn(MOBWITH_B_SHEET, MOBWITH_B_COLS)
 
-    dates_set = set()
+    dates_in_sheet = set()
+    ad_types = []
     by_id = {}
     for r in rows:
         d = normalize_date(r.get('date'))
         pid_raw = parse_gviz_value(r.get('id'))
-        imp, clk, rev = _num_or_none(r.get('impressions')), _num_or_none(r.get('clicks')), _num_or_none(r.get('revenue'))
+        imp = _num_or_none(r.get('impressions'))
+        clk = _num_or_none(r.get('clicks'))
+        rev = _num_or_none(r.get('revenue'))
         if not d or pid_raw is None or imp is None or clk is None or rev is None:
             continue
         try:
             pid = int(pid_raw)
         except (TypeError, ValueError):
             continue
+        at_raw = r.get('adtype')
+        at = at_raw.strip() if isinstance(at_raw, str) and at_raw.strip() else '미분류'
+        if at not in ad_types:
+            ad_types.append(at)
+
         name_raw = r.get('name')
         name = clean_placement_name(name_raw) if isinstance(name_raw, str) else str(pid)
         os_raw = r.get('os')
         os_val = os_raw if isinstance(os_raw, str) and os_raw.strip() else None
 
-        dates_set.add(d)
-        entry = by_id.setdefault(pid, {'id': pid, 'name': name, 'os': os_val, 'daily': {}})
-        entry['daily'][d] = (imp, clk, rev)  # 중복 date+id는 마지막 값으로 덮어씀
-        entry['name'] = name  # 최신 행의 이름/OS로 갱신 (표기 차이 흡수)
+        dates_in_sheet.add(d)
+        e = by_id.setdefault(pid, {'id': pid, 'name': name, 'os': os_val, 'cells': {}})
+        e['cells'][(d, at)] = (imp, clk, rev)  # 중복은 마지막 값으로 덮어씀
+        e['name'] = name
         if os_val:
-            entry['os'] = os_val
+            e['os'] = os_val
 
-    if not dates_set:
-        return {'dates': [], 'placements': [], 'generatedAt': now_str()}
+    if not dates_in_sheet:
+        return {'dates': [], 'adTypes': [], 'placements': [], 'generatedAt': now_str()}
 
-    dates = build_date_range(min(dates_set), max(dates_set))
+    dates = build_date_range(min(dates_in_sheet), max(dates_in_sheet))
+    latest = dates[-1]
+
     placements = []
     for pid, e in by_id.items():
+        own_dates = sorted({d for (d, _at) in e['cells']})
+        first_d, last_d = own_dates[0], own_dates[-1]
+
+        by_type = {}
+        for at in ad_types:
+            imps, clks, revs = [], [], []
+            for d in dates:
+                cell = e['cells'].get((d, at))
+                if cell is not None:
+                    imps.append(cell[0]); clks.append(cell[1]); revs.append(cell[2])
+                elif d in dates_in_sheet and first_d <= d <= last_d:
+                    imps.append(0.0); clks.append(0.0); revs.append(0.0)  # 안 적은 0
+                else:
+                    imps.append(None); clks.append(None); revs.append(None)
+            by_type[at] = {'impressions': imps, 'clicks': clks, 'revenue': revs}
+
         placements.append({
             'id': pid, 'name': e['name'], 'os': e['os'],
-            'impressions': [e['daily'][d][0] if d in e['daily'] else None for d in dates],
-            'clicks': [e['daily'][d][1] if d in e['daily'] else None for d in dates],
-            'revenue': [e['daily'][d][2] if d in e['daily'] else None for d in dates],
+            'byType': by_type,
+            'lastDate': last_d,
+            # 최신 날짜에 row가 없으면 중지(또는 일시정지)된 것으로 본다
+            'stopped': last_d < latest,
         })
-    placements.sort(key=lambda p: -sum(v for v in p['revenue'] if v is not None))
 
-    return {'dates': dates, 'placements': placements, 'generatedAt': now_str()}
+    def total_rev(p):
+        s = 0.0
+        for at in ad_types:
+            s += sum(v for v in p['byType'][at]['revenue'] if v is not None)
+        return s
+    placements.sort(key=lambda p: -total_rev(p))
 
+    return {'dates': dates, 'adTypes': ad_types, 'placements': placements,
+            'generatedAt': now_str()}
+
+
+def reconcile_mobwith(daily, b_payload):
+    """B를 광고유형별로 날짜 합산한 값이 A(SSP)/C(직광고)와 맞는지 대조한다.
+
+    수기로 수치를 옮긴 구조라 어긋날 수 있는데, 이런 불일치는 나중에 발견하면
+    원인을 찾기가 매우 어렵다. 그래서 갱신할 때마다 자동으로 확인하고 차이나는
+    날짜를 payload에 남겨 화면에 경고로 띄운다. 반올림 수준(RECONCILE_TOLERANCE)
+    차이는 무시한다.
+    """
+    date_idx = {d: i for i, d in enumerate(daily['dates'])}
+    # 화면 토글 키(ssp/direct)와 시트의 광고유형 값을 잇는다
+    pairs = [('ssp', 'SSP'), ('direct', '직광고')]
+
+    issues = []
+    for series_key, at in pairs:
+        if at not in b_payload.get('adTypes', []):
+            continue
+        sheet_rev = daily['series'][series_key]['revenue']
+        for i, d in enumerate(b_payload['dates']):
+            if d not in date_idx:
+                continue
+            b_sum = 0.0
+            any_val = False
+            for p in b_payload['placements']:
+                v = p['byType'][at]['revenue'][i]
+                if v is not None:
+                    b_sum += v; any_val = True
+            expected = sheet_rev[date_idx[d]]
+            if not any_val or expected is None:
+                continue
+            diff = b_sum - expected
+            if abs(diff) > RECONCILE_TOLERANCE:
+                issues.append({'date': d, 'type': at,
+                               'sheet': round(expected, 2), 'heatmap': round(b_sum, 2),
+                               'diff': round(diff, 2)})
+    issues.sort(key=lambda x: (x['date'], x['type']))
+    return issues
 
 
 def build_date_range(start_s, end_s):
@@ -536,15 +653,26 @@ if __name__ == '__main__':
     print('wrote data.json: %d dates, %d vendors' % (
         len(payload.get('dates', [])), len(payload.get('vendors', {}))))
 
-    mobwith_a = build_mobwith_a_payload()
+    mobwith_a = build_mobwith_daily_payload()
+    mobwith_b = build_mobwith_b_payload()
+
+    # B(광고유형별 합계) vs A/C(시트 값) 대조 — 어긋나면 화면에 경고로 띄운다
+    issues = reconcile_mobwith(mobwith_a, mobwith_b)
+    mobwith_a['reconcile'] = issues
+    mobwith_b['reconcile'] = issues
+
     with open('mobwith-a.json', 'w', encoding='utf-8') as f:
         json.dump(mobwith_a, f, ensure_ascii=False)
-    print('wrote mobwith-a.json: %d dates' % len(mobwith_a.get('dates', [])))
+    print('wrote mobwith-a.json: %d dates (SSP/직광고/전체)' % len(mobwith_a.get('dates', [])))
 
-    mobwith_b = build_mobwith_b_payload()
     with open('mobwith-b.json', 'w', encoding='utf-8') as f:
         json.dump(mobwith_b, f, ensure_ascii=False)
-    print('wrote mobwith-b.json: %d placements' % len(mobwith_b.get('placements', [])))
+    stopped_n = sum(1 for p in mobwith_b.get('placements', []) if p.get('stopped'))
+    print('wrote mobwith-b.json: %d placements, 광고유형 %s, 중지 %d개' % (
+        len(mobwith_b.get('placements', [])), mobwith_b.get('adTypes', []), stopped_n))
+    if issues:
+        print('  ! A/C와 B 합계가 어긋나는 날 %d건 (예: %s)' % (
+            len(issues), issues[0]))
 
     apcorn = build_apcorn_ssp_payload()
     with open('apcorn-ssp.json', 'w', encoding='utf-8') as f:
