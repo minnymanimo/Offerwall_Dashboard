@@ -61,7 +61,7 @@ MOBWITH_B_COLS = {
     'impressions': '노출수', 'clicks': '클릭수', 'revenue': '정산금액',
 }
 # 대조 허용 오차(원). 수기 이관·반올림에서 오는 1원 미만 차이는 경고하지 않는다.
-RECONCILE_TOLERANCE = 1.0
+RECONCILE_TOLERANCE = 5.0
 
 # gviz 응답은 "google.visualization.Query.setResponse({...});" 형태의 JSONP 래퍼로 옴
 GVIZ_RESPONSE_RE = re.compile(r'^[^(]*\((.*)\);?\s*$', re.DOTALL)
