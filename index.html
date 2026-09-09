@@ -84,7 +84,7 @@
 
   /* ① 전체 — 가장 크게 */
   .sum-hero{background:var(--surface);border:1px solid var(--border);border-radius:14px;
-    padding:20px 22px;margin-bottom:12px;}
+    padding:20px;margin-bottom:12px;}
   .sh-label{font-family:var(--mono);font-size:12.5px;letter-spacing:.06em;color:var(--text-dim);margin-bottom:8px;}
   .sh-value{font-size:37px;font-weight:700;letter-spacing:-.02em;line-height:1.05;}
   .sh-meta{font-family:var(--mono);font-size:13.5px;margin-top:9px;display:flex;align-items:center;
@@ -94,8 +94,8 @@
 
   /* ② 두 사업 */
   .sum-two{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;}
-  .sum-gcard{background:var(--surface);border:1px solid var(--border);border-radius:13px;
-    padding:16px 18px;position:relative;overflow:hidden;}
+  .sum-gcard{background:var(--surface);border:1px solid var(--border);border-radius:14px;
+    padding:18px 20px;position:relative;overflow:hidden;}
   .sum-gcard::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;}
   .sum-gcard.is-ow::before{background:var(--c-grp-offerwall);}
   .sum-gcard.is-an::before{background:var(--c-grp-adnetwork);}
@@ -107,7 +107,7 @@
     display:flex;gap:10px;flex-wrap:wrap;}
 
   /* ③ 업체별 순위 목록 */
-  .sum-list{background:var(--surface);border:1px solid var(--border);border-radius:13px;padding:6px 18px 12px;}
+  .sum-list{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:6px 20px 14px;}
   .sl-head,.sl-row{display:grid;grid-template-columns:230px 1fr 112px 78px;gap:12px;align-items:center;}
   .sl-head{padding:10px 0 6px;font-family:var(--mono);font-size:11.5px;color:var(--text-faint);letter-spacing:.05em;}
   .sl-head div:nth-child(3),.sl-head div:nth-child(4){text-align:right;}
@@ -130,7 +130,7 @@
   /* ---- Trend panel ---- */
   .trend-card{
     background:var(--surface);border:1px solid var(--border);border-radius:14px;
-    padding:20px 20px 14px;
+    padding:20px;
   }
   .trend-head{
     display:flex;justify-content:space-between;align-items:flex-start;
@@ -169,17 +169,28 @@
   .chart-error-box.is-empty{
     color:var(--text-dim);border-color:var(--border);
   }
-  .series-bar{
-    display:flex;justify-content:space-between;align-items:center;
-    flex-wrap:wrap;gap:10px;margin-top:14px;
-  }
-  .series-toggles{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:flex-start;}
-  .chip-group{display:flex;flex-direction:column;gap:6px;}
-  .chip-group-title{display:flex;align-items:center;gap:6px;font-family:var(--mono);
-    font-size:12.5px;letter-spacing:.06em;color:var(--text-dim);text-transform:uppercase;font-weight:700;}
+  /* 범례 영역 — 구역(업체별/유형별/합계)을 세로로 쌓는다.
+     가로 배치(flex-wrap)로 두면 구역 폭이 제각각이라 줄바꿈이 들쭉날쭉해진다. */
+  .series-bar{margin-top:18px;}
+  .series-toggles{display:flex;flex-direction:column;gap:0;}
+
+  /* 구역 사이는 구분선으로 나눠 성격이 다른 묶음임을 드러낸다 */
+  .chip-group{display:flex;flex-direction:column;gap:10px;padding:14px 0;
+    border-top:1px solid var(--border);}
+  .chip-group:first-child{border-top:none;padding-top:4px;}
+  .chip-group:last-child{padding-bottom:2px;}
+
+  .chip-group-title{display:flex;align-items:center;gap:8px;font-family:var(--mono);
+    font-size:12px;letter-spacing:.08em;color:var(--text-dim);text-transform:uppercase;font-weight:700;}
+
+  /* 업체별 안의 OFFERWALL/ADNETWORK 하위 묶음 — 살짝 들여써서 상하 관계를 보이게 */
+  .chip-subgroup{display:flex;flex-direction:column;gap:8px;padding-left:12px;
+    border-left:2px solid var(--border);}
+  .chip-subgroup-title{font-size:11px;letter-spacing:.06em;font-weight:600;color:var(--text-faint);}
+
   .cg-all{font-family:var(--mono);font-size:11px;color:var(--text-faint);
-    background:var(--surface-2);border:1px solid var(--border);border-radius:5px;
-    padding:2px 8px;cursor:pointer;margin-left:2px;letter-spacing:0;text-transform:none;}
+    background:var(--surface-2);border:1px solid var(--border);border-radius:6px;
+    padding:3px 9px;cursor:pointer;letter-spacing:0;text-transform:none;line-height:1.4;}
   .cg-all:hover{color:var(--text);border-color:var(--accent);}
   .cg-all[aria-pressed="true"]{color:var(--accent);border-color:var(--accent);background:var(--accent-soft);}
   .cg-bar{width:14px;height:3px;border-radius:2px;display:inline-block;}
@@ -326,8 +337,6 @@
     </div>
     <div class="series-bar">
       <div class="series-toggles" id="seriesToggles"></div>
-      <div class="series-actions">
-      </div>
     </div>
     <div class="trend-foot">
       <span class="hint">항목을 클릭하면 그래프에서 켜고 끌 수 있습니다.</span>
@@ -386,6 +395,24 @@ let seriesVisible = {};
 
 /* ---------- KPI ---------- */
 const TOTAL_KEY = '__total__';
+// 켜져 있는 업체들만 더한 선. 업체 선택을 바꾸면 값이 따라 바뀐다.
+const SELECTED_KEY = '__selected__';
+
+// '선택 합계'가 더할 업체 목록.
+// 업체를 직접 켠 경우뿐 아니라, 유형별 합계(오퍼월/애드네트워크)를 켠 경우도
+// 그 유형에 속한 업체들이 선택된 것으로 본다. 그래야 유형별을 모두 켰을 때
+// 선택 합계가 전체 합계와 같아진다.
+function selectedVendorKeys(){
+  const {vendors} = PAYLOAD;
+  const krwKeys = Object.keys(vendors).filter(k => vendors[k].currency === 'KRW');
+  const picked = new Set(krwKeys.filter(k => seriesVisible[k] !== false));
+  GROUP_ORDER.forEach(g => {
+    if (seriesVisible[GROUP_KEY_PREFIX + g] === true){
+      krwKeys.filter(k => vendors[k].group === g).forEach(k => picked.add(k));
+    }
+  });
+  return krwKeys.filter(k => picked.has(k));   // 원래 순서 유지
+}
 const GROUP_LABELS = { Offerwall: 'Offerwall', AdNetwork: 'AdNetwork' };
 const GROUP_ORDER = ['Offerwall', 'AdNetwork'];
 
@@ -577,6 +604,14 @@ function buildDatasets(){
       {_onCount: krwKeys.length}));
   }
 
+  // 선택 합계 — 지금 켜져 있는 업체만 더한다. 켜진 업체가 없으면 더할 게 없으므로
+  // 선을 만들지 않는다(빈 선이 그려지면 0원처럼 보여 오해를 부른다).
+  const onVendorKeys = selectedVendorKeys();
+  if (seriesVisible[SELECTED_KEY] === true && onVendorKeys.length){
+    datasets.push(aggLine(`선택 합계 (${onVendorKeys.length}곳)`, SELECTED_KEY,
+      sumOf(onVendorKeys), getVar('--accent'), {_onCount: onVendorKeys.length}));
+  }
+
   return {labels, datasets, excluded};
 }
 
@@ -588,7 +623,6 @@ function renderSeriesToggles(datasets){
   const {vendors} = PAYLOAD;
   const krwKeys = Object.keys(vendors).filter(k => vendors[k].currency === 'KRW');
 
-  // 기간 합계와 데이터 일수 (벤더마다 수집 시작일이 달라, 금액만 나란히 보면 규모를 오해할 수 있어서)
   const statsOf = arr => {
     let sum = 0, days = 0;
     arr.forEach(v => { if (v !== null && v !== undefined){ sum += v; days++; } });
@@ -605,70 +639,109 @@ function renderSeriesToggles(datasets){
     return out;
   };
 
-  const makeChip = ({key, label, color, data, dashed, metaText}) => {
-    const on = key === TOTAL_KEY || key.startsWith(GROUP_KEY_PREFIX)
-      ? seriesVisible[key] === true          // 합계선은 기본 꺼짐 (개별 선이 눌리지 않도록)
-      : seriesVisible[key] !== false;        // 업체는 기본 켜짐
-    const {sum, days} = statsOf(data);
+  // 합계선은 기본 꺼짐, 업체선은 기본 켜짐이라 판정 기준이 반대다.
+  const isOn = c => c.aggregate ? seriesVisible[c.key] === true : seriesVisible[c.key] !== false;
+
+  const makeChip = c => {
+    const {sum, days} = statsOf(c.data);
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.className = 'series-chip' + (dashed ? ' is-dashed' : '');
-    btn.dataset.key = key;
-    btn.setAttribute('aria-pressed', String(on));
-    btn.style.setProperty('--chip-color', color);
-    btn.innerHTML = `<span class="swatch"></span><span>${label}</span>` +
+    btn.className = 'series-chip' + (c.dashed ? ' is-dashed' : '');
+    btn.dataset.key = c.key;
+    btn.setAttribute('aria-pressed', String(isOn(c)));
+    btn.style.setProperty('--chip-color', c.color);
+    btn.innerHTML = `<span class="swatch"></span><span>${c.label}</span>` +
       `<span class="chip-sum">${days ? '₩' + numFmt0.format(sum) : '–'}</span>` +
-      `<span class="chip-days">${metaText != null ? metaText : days + '일'}</span>`;
+      `<span class="chip-days">${c.metaText != null ? c.metaText : days + '일'}</span>`;
     return btn;
   };
 
-  GROUP_ORDER.forEach(g => {
-    const keys = krwKeys.filter(k => vendors[k].group === g);
-    if (!keys.length) return;
-    const allOn = keys.every(k => seriesVisible[k] !== false);
-
+  // 섹션 하나를 그린다. 섹션 제목 옆 '모두 켜기'는 그 섹션 안의 칩만 대상으로 한다.
+  // hasButton=false면 버튼 없이 제목만 (전체 합계처럼 독립적으로 두는 항목용).
+  const addSection = (sectionKey, title, barColor, chips, hasButton = true) => {
+    if (!chips.length) return;
+    const allOn = chips.every(isOn);
     const wrap = document.createElement('div');
     wrap.className = 'chip-group';
     const head = document.createElement('div');
     head.className = 'chip-group-title';
     head.innerHTML =
-      `<span class="cg-bar" style="background:${getVar(g === 'Offerwall' ? '--c-grp-offerwall' : '--c-grp-adnetwork')}"></span>` +
-      `${GROUP_LABELS[g]}` +
-      `<button type="button" class="cg-all" data-group="${g}" aria-pressed="${allOn}">모두 켜기</button>`;
+      (barColor ? `<span class="cg-bar" style="background:${barColor}"></span>` : '') + title +
+      (hasButton
+        ? `<button type="button" class="cg-all" data-section="${sectionKey}" aria-pressed="${allOn}">모두 켜기</button>`
+        : '');
     wrap.appendChild(head);
+    const row = document.createElement('div');
+    row.className = 'chip-group-items';
+    chips.forEach(c => row.appendChild(makeChip(c)));
+    wrap.appendChild(row);
+    box.appendChild(wrap);
+  };
 
+  // ① 업체별 — OFFERWALL/ADNETWORK는 색이 붙은 하위 라벨로만 남기고,
+  //    '모두 켜기'는 6개 전체를 한 번에 다루는 버튼 하나만 둔다.
+  const vendorChipsAll = [];
+  const outer = document.createElement('div');
+  outer.className = 'chip-group';
+  const outerHead = document.createElement('div');
+  outerHead.className = 'chip-group-title';
+  const allVendorsOn = krwKeys.length > 0 && krwKeys.every(k => seriesVisible[k] !== false);
+  outerHead.innerHTML =
+    `업체별` +
+    `<button type="button" class="cg-all" data-section="vendors" aria-pressed="${allVendorsOn}">모두 켜기</button>`;
+  outer.appendChild(outerHead);
+
+  GROUP_ORDER.forEach(g => {
+    const keys = krwKeys.filter(k => vendors[k].group === g);
+    if (!keys.length) return;
+    const sub = document.createElement('div');
+    sub.className = 'chip-subgroup';
+    const subHead = document.createElement('div');
+    subHead.className = 'chip-group-title chip-subgroup-title';
+    subHead.innerHTML = `<span class="cg-bar" style="background:${
+      getVar(g === 'Offerwall' ? '--c-grp-offerwall' : '--c-grp-adnetwork')}"></span>${GROUP_LABELS[g]}`;
+    sub.appendChild(subHead);
     const row = document.createElement('div');
     row.className = 'chip-group-items';
     keys.forEach(key => {
-      row.appendChild(makeChip({key, label: vendors[key].label,
-                                color: colorMap[key], data: sliceOf(key)}));
+      const chip = {key, label: vendors[key].label, color: colorMap[key], data: sliceOf(key)};
+      vendorChipsAll.push(chip);
+      row.appendChild(makeChip(chip));
     });
-    // 묶음 합계 칩 — 개별 업체와 성격이 다르므로 점선 스와치로 구분
-    row.appendChild(makeChip({
-      key: GROUP_KEY_PREFIX + g,
-      label: GROUP_LABELS[g] + ' 합계',
-      color: getVar(g === 'Offerwall' ? '--c-grp-offerwall' : '--c-grp-adnetwork'),
-      data: sumSeries(keys), dashed: true, metaText: keys.length + '곳',
-    }));
-    wrap.appendChild(row);
-    box.appendChild(wrap);
+    sub.appendChild(row);
+    outer.appendChild(sub);
   });
+  if (vendorChipsAll.length) box.appendChild(outer);
 
-  // 전체 합계
-  const wrap2 = document.createElement('div');
-  wrap2.className = 'chip-group';
-  const head2 = document.createElement('div');
-  head2.className = 'chip-group-title';
-  head2.innerHTML = '<span class="cg-bar" style="background:var(--c-total)"></span>전체';
-  wrap2.appendChild(head2);
-  const row2 = document.createElement('div');
-  row2.className = 'chip-group-items';
-  row2.appendChild(makeChip({
-    key: TOTAL_KEY, label: '전체 합계', color: getVar('--c-total'),
-    data: sumSeries(krwKeys), dashed: true, metaText: krwKeys.length + '곳',
-  }));
-  wrap2.appendChild(row2);
-  box.appendChild(wrap2);
+  // ② 유형별 — 오퍼월 합계 / 애드네트워크 합계. 업체별과 서로 전환되는 관계다.
+  const typeChips = [];
+  GROUP_ORDER.forEach(g => {
+    const keys = krwKeys.filter(k => vendors[k].group === g);
+    if (!keys.length) return;
+    typeChips.push({key: GROUP_KEY_PREFIX + g, label: GROUP_LABELS[g] + ' 합계',
+                    color: getVar(g === 'Offerwall' ? '--c-grp-offerwall' : '--c-grp-adnetwork'),
+                    data: sumSeries(keys), dashed: true, aggregate: true,
+                    metaText: keys.length + '곳'});
+  });
+  addSection('types', '유형별', null, typeChips);
+
+  // ③ 합계 — 업체별·유형별과 성격이 달라 전환 대상에서 빼고,
+  //    켜고 끄는 건 칩 자체로만 하므로 '모두 켜기' 버튼도 두지 않는다.
+  if (krwKeys.length){
+    const onVendorKeys = selectedVendorKeys();
+    const sumChips = [{
+      key: TOTAL_KEY, label: '전체 합계', color: getVar('--c-total'),
+      data: sumSeries(krwKeys), dashed: true, aggregate: true,
+      metaText: krwKeys.length + '곳',
+    }, {
+      // 선택 합계 — 위 업체별에서 켜둔 업체만 더한 값. 켠 업체를 바꾸면 같이 바뀐다.
+      key: SELECTED_KEY, label: '선택 합계', color: getVar('--accent'),
+      data: onVendorKeys.length ? sumSeries(onVendorKeys) : [],
+      dashed: true, aggregate: true,
+      metaText: onVendorKeys.length ? onVendorKeys.length + '곳 선택' : '업체 선택 필요',
+    }];
+    addSection('total', '합계', null, sumChips, false);
+  }
 }
 
 
@@ -967,19 +1040,36 @@ document.getElementById('seriesToggles').addEventListener('click', (ev) => {
   // 그룹 헤더의 '모두 켜기/끄기'
   const allBtn = ev.target.closest('.cg-all');
   if (allBtn){
-    const g = allBtn.dataset.group;
-    const keys = Object.keys(PAYLOAD.vendors)
-      .filter(k => PAYLOAD.vendors[k].currency === 'KRW' && PAYLOAD.vendors[k].group === g);
-    const allOn = keys.every(k => seriesVisible[k] !== false);
-    keys.forEach(k => { seriesVisible[k] = !allOn; });
+    const section = allBtn.closest('.chip-group');
+    const chips = [...section.querySelectorAll('.series-chip')];
+    const allOn = chips.every(c => c.getAttribute('aria-pressed') === 'true');
+
+    if (allOn){
+      // 이미 전부 켜져 있으면 끈다 (같은 버튼을 다시 누르면 꺼지는 동작 유지)
+      chips.forEach(c => { seriesVisible[c.dataset.key] = false; });
+    } else {
+      // 켤 때는 '전환'처럼 동작한다 — 업체별을 켜면 유형별이 꺼지고, 반대도 마찬가지.
+      // 업체 6선과 그룹 합계 2선을 동시에 그리면 같은 매출이 두 번 그려져 그래프가
+      // 복잡해지기 때문. 전체 합계는 성격이 달라 이 전환에서 제외한다.
+      const OPPOSITE = {vendors: 'types', types: 'vendors'};
+      const other = OPPOSITE[allBtn.dataset.section];
+      if (other){
+        const otherBtn = document.querySelector(`.cg-all[data-section="${other}"]`);
+        if (otherBtn){
+          otherBtn.closest('.chip-group').querySelectorAll('.series-chip')
+            .forEach(c => { seriesVisible[c.dataset.key] = false; });
+        }
+      }
+      chips.forEach(c => { seriesVisible[c.dataset.key] = true; });
+    }
     renderTrend();
     return;
   }
   const btn = ev.target.closest('.series-chip');
   if (!btn) return;
   const key = btn.dataset.key;
-  // 합계선은 기본 꺼짐이라 판정 기준이 반대다
-  const isAgg = key === TOTAL_KEY || key.startsWith(GROUP_KEY_PREFIX);
+  // 합계선(전체/유형별/선택)은 기본 꺼짐이라 판정 기준이 반대다
+  const isAgg = key === TOTAL_KEY || key === SELECTED_KEY || key.startsWith(GROUP_KEY_PREFIX);
   seriesVisible[key] = isAgg ? !(seriesVisible[key] === true) : !(seriesVisible[key] !== false);
   renderTrend();
 });
