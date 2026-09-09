@@ -6,7 +6,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script src="./vendor/chart.umd.min.js"></script>
 <style>
-
   :root{
     --bg:#0b0b11;
     --surface:#15151f;
@@ -17,8 +16,15 @@
     --text-faint:#54526a;
     --accent:#8b6fff;
     --accent-soft:rgba(139,111,255,0.14);
-    --c-ssp:#38bdf8; --c-direct:#fbbf24;
-    --c-metric:#60a5fa;
+    --c-nbt:#8b6fff;
+    --c-buzzvil:#4fd1c5;
+    --c-apcorn:#f6b860;
+    --c-adop:#f6789e;
+    --c-mobwith-a:#60a5fa;
+    --c-adpopcorn-ofw:#a3e635;
+    --c-total:#eceaf4;
+    --c-grp-offerwall:#4ade80;
+    --c-grp-adnetwork:#38bdf8;
     --up:#5ee6a4;
     --down:#f6789e;
     --mono:'JetBrains Mono','SF Mono',Consolas,'Courier New',monospace;
@@ -47,7 +53,7 @@
 
   header{
     display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:16px;
-    padding-bottom:22px;margin-bottom:24px;border-bottom:1px solid var(--border);
+    padding-bottom:22px;margin-bottom:28px;border-bottom:1px solid var(--border);
   }
   .eyebrow{
     font-family:var(--mono);font-size:11px;letter-spacing:0.16em;color:var(--accent);
@@ -70,20 +76,78 @@
   }
   #refreshBtn:hover{color:var(--text);border-color:var(--accent);}
 
-  .controls-row{
-    display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px;
-    margin-bottom:22px;
+  /* ---- KPI ---- */
+  .kpi-grid{margin-bottom:28px;}
+
+  /* ① 전체 — 가장 크게 */
+  .sum-hero{background:var(--surface);border:1px solid var(--border);border-radius:14px;
+    padding:20px 22px;margin-bottom:12px;}
+  .sh-label{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--text-dim);margin-bottom:8px;}
+  .sh-value{font-size:34px;font-weight:700;letter-spacing:-.02em;line-height:1.05;}
+  .sh-meta{font-family:var(--mono);font-size:12px;margin-top:9px;display:flex;align-items:center;
+    gap:5px;flex-wrap:wrap;}
+  .sh-dim{color:var(--text-faint);}
+  .sh-warn{color:var(--down);}
+
+  /* ② 두 사업 */
+  .sum-two{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;}
+  .sum-gcard{background:var(--surface);border:1px solid var(--border);border-radius:13px;
+    padding:16px 18px;position:relative;overflow:hidden;}
+  .sum-gcard::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;}
+  .sum-gcard.is-ow::before{background:var(--c-grp-offerwall);}
+  .sum-gcard.is-an::before{background:var(--c-grp-adnetwork);}
+  .sg-label{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;margin-bottom:7px;text-transform:uppercase;}
+  .sum-gcard.is-ow .sg-label{color:var(--c-grp-offerwall);}
+  .sum-gcard.is-an .sg-label{color:var(--c-grp-adnetwork);}
+  .sg-value{font-size:22px;font-weight:700;letter-spacing:-.01em;}
+  .sg-meta{font-family:var(--mono);font-size:11px;color:var(--text-faint);margin-top:6px;
+    display:flex;gap:10px;flex-wrap:wrap;}
+
+  /* ③ 업체별 순위 목록 */
+  .sum-list{background:var(--surface);border:1px solid var(--border);border-radius:13px;padding:6px 18px 12px;}
+  .sl-head,.sl-row{display:grid;grid-template-columns:230px 1fr 112px 78px;gap:12px;align-items:center;}
+  .sl-head{padding:10px 0 6px;font-family:var(--mono);font-size:10px;color:var(--text-faint);letter-spacing:.05em;}
+  .sl-head div:nth-child(3),.sl-head div:nth-child(4){text-align:right;}
+  .sl-row{padding:9px 0;border-bottom:1px solid var(--border);}
+  .sl-row:last-child{border-bottom:none;}
+  .sl-name{font-size:12.5px;display:flex;align-items:center;gap:7px;min-width:0;}
+  .sl-vlabel{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .sl-grp{flex:none;font-family:var(--mono);font-size:9.5px;border-radius:4px;padding:1px 6px;letter-spacing:.02em;}
+  .sl-grp.is-ow{background:rgba(74,222,128,.15);color:var(--c-grp-offerwall);}
+  .sl-grp.is-an{background:rgba(56,189,248,.15);color:var(--c-grp-adnetwork);}
+  .sl-dot{width:9px;height:9px;border-radius:2px;flex:none;}
+  .sl-bar{height:7px;background:var(--surface-2);border-radius:4px;overflow:hidden;}
+  .sl-bar i{display:block;height:100%;border-radius:4px;}
+  .sl-amt{font-family:var(--mono);font-size:12.5px;text-align:right;font-weight:600;}
+  .sl-chg{font-family:var(--mono);font-size:11.5px;text-align:right;}
+  .sl-chg .arrow-up{color:var(--up);} .sl-chg .arrow-down{color:var(--down);}
+  .sh-meta .arrow-up,.sg-meta .arrow-up{color:var(--up);}
+  .sh-meta .arrow-down,.sg-meta .arrow-down{color:var(--down);}
+
+  /* ---- Trend panel ---- */
+  .trend-card{
+    background:var(--surface);border:1px solid var(--border);border-radius:14px;
+    padding:20px 20px 14px;
   }
+  .trend-head{
+    display:flex;justify-content:space-between;align-items:flex-start;
+    flex-wrap:wrap;gap:14px;margin-bottom:16px;
+  }
+  .trend-title{font-size:15px;font-weight:700;margin-bottom:3px;}
+  .trend-sub{font-family:var(--mono);font-size:10.5px;color:var(--text-faint);}
+
   .controls{display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
   .seg{display:flex;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;overflow:hidden;}
   .seg button{
     font-family:var(--mono);font-size:11px;color:var(--text-dim);
-    background:transparent;border:0;padding:6px 12px;cursor:pointer;border-right:1px solid var(--border);
+    background:transparent;border:0;padding:6px 12px;cursor:pointer;
+    border-right:1px solid var(--border);
   }
   .seg button:last-child{border-right:0;}
   .seg button:hover{color:var(--text);}
   .seg button.active{background:var(--accent-soft);color:var(--accent);font-weight:700;}
   .seg button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px;}
+
   .date-range{display:flex;align-items:center;gap:6px;}
   .date-range input[type="date"]{
     font-family:var(--mono);font-size:11px;color:var(--text);
@@ -92,279 +156,126 @@
   }
   .date-range input:focus-visible{outline:2px solid var(--accent);outline-offset:-1px;}
   .date-range span{font-family:var(--mono);font-size:11px;color:var(--text-faint);}
-  .period-label{font-family:var(--mono);font-size:10.5px;color:var(--text-faint);}
 
-  .kpi-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:28px;}
-  .kpi-card{
-    background:var(--surface);border:1px solid var(--border);border-radius:14px;
-    padding:16px;position:relative;overflow:hidden;
-  }
-  .kpi-card::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;background:var(--c-metric);}
-  .kpi-label{font-size:11.5px;color:var(--text-dim);font-weight:600;margin-bottom:10px;}
-  .kpi-value{font-family:var(--mono);font-size:18px;font-weight:700;letter-spacing:-0.02em;}
-  .kpi-unit{font-size:10px;color:var(--text-faint);margin-top:3px;}
-
-  .chart-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:28px;}
-  .chart-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px 16px 8px;}
-  .chart-title{font-size:12.5px;font-weight:700;margin-bottom:8px;}
-  .chart-box{height:150px;position:relative;}
-  #mwa-chartGrid .chart-box{height:128px;}
-
-  .table-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px;overflow-x:auto;}
-  .table-title{font-size:15px;font-weight:700;margin-bottom:16px;}
-  table.datatable{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:13px;white-space:nowrap;}
-  table.datatable th, table.datatable td{padding:11px 14px;text-align:right;border-bottom:1px solid var(--border);}
-  table.datatable th:first-child, table.datatable td:first-child{text-align:left;font-weight:600;}
-  table.datatable th{color:var(--text-dim);font-weight:700;font-size:11.5px;letter-spacing:.02em;
-    position:sticky;top:0;background:var(--surface);padding-bottom:13px;border-bottom:2px solid var(--border);
-    cursor:pointer;user-select:none;}
-  table.datatable th:hover{color:var(--text);}
-  table.datatable th.sorted{color:var(--accent);}
-  table.datatable tbody tr:nth-child(even){background:rgba(255,255,255,0.015);}
-  table.datatable tbody tr:hover{background:var(--accent-soft);}
-  table.datatable tbody tr.latest-row td{color:var(--text);font-weight:700;}
-  table.datatable tbody tr.latest-row{background:rgba(139,111,255,0.06);}
-  table.datatable .latest-tag{font-size:10px;font-weight:400;color:var(--accent);}
-  table.datatable td.na{color:var(--text-faint);}
-  .kpi-delta{font-family:var(--mono);font-size:11px;margin-top:8px;display:flex;align-items:center;gap:5px;color:var(--text-dim);}
-  .kpi-delta .arrow-up{color:var(--up);}
-  .kpi-delta .arrow-down{color:var(--down);}
-
+  .chart-box{height:400px;position:relative;}
   .chart-error-box{
+    position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
     text-align:center;padding:24px;color:var(--down);font-size:13px;line-height:1.6;
     background:var(--surface-2);border:1px dashed rgba(246,120,158,0.35);border-radius:10px;
   }
-
-  @media (max-width:960px){
-    .kpi-grid{grid-template-columns:repeat(3,1fr);}
-    .chart-grid{grid-template-columns:1fr 1fr;}
+  .chart-error-box.is-empty{
+    color:var(--text-dim);border-color:var(--border);
   }
-  @media (max-width:640px){
+  .series-bar{
+    display:flex;justify-content:space-between;align-items:center;
+    flex-wrap:wrap;gap:10px;margin-top:14px;
+  }
+  .series-toggles{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:flex-start;}
+  .chip-group{display:flex;flex-direction:column;gap:6px;}
+  .chip-group-title{display:flex;align-items:center;gap:6px;font-family:var(--mono);
+    font-size:11px;letter-spacing:.06em;color:var(--text-dim);text-transform:uppercase;font-weight:700;}
+  .cg-all{font-family:var(--mono);font-size:9.5px;color:var(--text-faint);
+    background:var(--surface-2);border:1px solid var(--border);border-radius:5px;
+    padding:2px 8px;cursor:pointer;margin-left:2px;letter-spacing:0;text-transform:none;}
+  .cg-all:hover{color:var(--text);border-color:var(--accent);}
+  .cg-all[aria-pressed="true"]{color:var(--accent);border-color:var(--accent);background:var(--accent-soft);}
+  .cg-bar{width:14px;height:3px;border-radius:2px;display:inline-block;}
+  .chip-group-items{display:flex;flex-wrap:wrap;gap:8px;}
+  .series-chip{
+    display:inline-flex;align-items:center;gap:7px;
+    font-family:var(--sans);font-size:12px;font-weight:600;
+    background:var(--surface-2);border:1px solid var(--border);
+    border-radius:999px;padding:5px 12px 5px 10px;cursor:pointer;
+    color:var(--text);transition:opacity .12s ease, border-color .12s ease;
+  }
+  .series-chip .swatch{
+    width:16px;height:3px;border-radius:2px;background:var(--chip-color);flex:none;
+  }
+  .series-chip .chip-sum{
+    font-family:var(--mono);font-size:11px;font-weight:400;color:var(--text-dim);
+  }
+  .series-chip .chip-days{
+    font-family:var(--mono);font-size:9.5px;font-weight:400;color:var(--text-faint);
+  }
+  .series-chip.is-dashed .swatch{
+    background:repeating-linear-gradient(90deg,var(--chip-color) 0 4px,transparent 4px 7px);
+  }
+  .series-chip[aria-pressed="true"]{border-color:var(--chip-color);}
+  .series-chip[aria-pressed="false"]{opacity:.4;color:var(--text-dim);}
+  .series-chip[aria-pressed="false"] .swatch{background:var(--text-faint);}
+  .series-chip:hover{border-color:var(--chip-color);}
+  .series-chip:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+
+  .series-actions{display:flex;gap:6px;}
+  .series-actions button{
+    font-family:var(--mono);font-size:10.5px;color:var(--text-dim);
+    background:transparent;border:1px solid var(--border);border-radius:6px;
+    padding:4px 9px;cursor:pointer;
+  }
+  .series-actions button:hover{color:var(--text);border-color:var(--accent);}
+  .series-actions button:focus-visible{outline:2px solid var(--accent);outline-offset:1px;}
+
+  .trend-foot{
+    display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;
+    margin-top:12px;padding-top:12px;border-top:1px solid var(--border);
+    font-family:var(--mono);font-size:10.5px;color:var(--text-faint);
+  }
+  .hint{color:var(--text-faint);}
+  .fx-warn-banner{
+    margin-bottom:14px;font-size:11.5px;color:var(--down);
+    background:rgba(246,120,158,0.08);border:1px solid rgba(246,120,158,0.25);
+    border-radius:8px;padding:9px 12px;
+  }
+
+  /* ---- Notes ---- */
+  .notes{margin-top:36px;padding-top:22px;border-top:1px solid var(--border);}
+  .notes-title{
+    font-family:var(--mono);font-size:11px;letter-spacing:0.1em;color:var(--text-dim);
+    text-transform:uppercase;margin-bottom:12px;
+  }
+  .notes ul{margin:0;padding-left:18px;}
+  .notes li{font-size:12.5px;color:var(--text-dim);line-height:1.8;margin-bottom:4px;}
+  .notes li b{color:var(--text);font-weight:600;}
+
+  @media (max-width:860px){
+    .sum-two{grid-template-columns:1fr;}
+    .sl-head,.sl-row{grid-template-columns:180px 1fr 100px;}
+    .sl-head div:nth-child(4),.sl-chg{display:none;}
+    .chart-box{height:320px;}
+    .trend-head{flex-direction:column;}
+  }
+  @media (max-width:520px){
     .wrap{padding:28px 16px 48px;}
-    .kpi-grid{grid-template-columns:1fr 1fr;}
-    .chart-grid{grid-template-columns:1fr;}
+    .sh-value{font-size:28px;}
     header{align-items:flex-start;}
     .meta-box{text-align:left;}
     .refresh-row{justify-content:flex-start;}
+    .chart-box{height:280px;}
+    .controls{gap:10px;}
   }
-
-
-  /* ---- Mobwith B 전용 ---- */
-
-  :root{
-    --bg:#0b0b11; --surface:#15151f; --surface-2:#1b1b28; --border:#282836;
-    --text:#eceaf4; --text-dim:#918fa3; --text-faint:#54526a;
-    --accent:#8b6fff; --accent-soft:rgba(139,111,255,0.14); --c-metric:#60a5fa;
-    --up:#5ee6a4; --down:#f6789e;
-    --mono:'JetBrains Mono','SF Mono',Consolas,monospace;
-    --sans:'Malgun Gothic','Apple SD Gothic Neo','Noto Sans KR',sans-serif;
+  @media (prefers-reduced-motion:reduce){
+    *{animation:none !important;transition:none !important;}
   }
-  *{box-sizing:border-box;}
-  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);-webkit-font-smoothing:antialiased;}
-  .wrap{max-width:1180px;margin:0 auto;padding:32px 24px 64px;}
-  .pagenav{display:flex;gap:6px;margin-bottom:20px;}
-  .pagenav a{
-    font-family:var(--mono);font-size:11.5px;color:var(--text-dim);text-decoration:none;
-    background:var(--surface);border:1px solid var(--border);border-radius:8px;
-    padding:7px 14px;transition:border-color .12s ease, color .12s ease;
-  }
-  .pagenav a:hover{color:var(--text);border-color:var(--accent);}
-  .pagenav a.active{color:var(--accent);border-color:var(--accent);background:var(--accent-soft);font-weight:700;}
-
-  header{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:16px;
-    padding-bottom:20px;margin-bottom:22px;border-bottom:1px solid var(--border);}
-  .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.16em;color:var(--accent);text-transform:uppercase;margin-bottom:9px;}
-  h1{font-size:22px;font-weight:700;margin:0 0 6px;letter-spacing:-.01em;}
-  .subtitle{font-size:12.5px;color:var(--text-dim);}
-  .meta-box{font-family:var(--mono);font-size:11.5px;color:var(--text-dim);text-align:right;line-height:1.7;}
-  .meta-box .pill{
-    display:inline-block;padding:2px 8px;border-radius:20px;
-    background:var(--accent-soft);color:var(--accent);font-size:10.5px;margin-left:6px;
-  }
-  .refresh-row{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:4px;}
-  #refreshIndicator{font-size:10.5px;color:var(--accent);min-width:70px;text-align:right;}
-  #refreshBtn{
-    font-family:var(--mono);font-size:10.5px;color:var(--text-dim);
-    background:var(--surface);border:1px solid var(--border);border-radius:6px;
-    padding:3px 9px;cursor:pointer;
-  }
-  #refreshBtn:hover{color:var(--text);border-color:var(--accent);}
-
-  .controls-row{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px;}
-  .seg{display:inline-flex;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;overflow:hidden;}
-  .seg button{font-family:var(--mono);font-size:11px;color:var(--text-dim);background:transparent;border:0;
-    padding:6px 12px;cursor:pointer;border-right:1px solid var(--border);}
-  .seg button:last-child{border-right:0;}
-  .seg button.active{background:var(--accent-soft);color:var(--accent);font-weight:700;}
-  .period-label{font-family:var(--mono);font-size:10.5px;color:var(--text-faint);}
-
-  .card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:20px;}
-  .card-title{font-size:14px;font-weight:700;margin-bottom:4px;}
-  .card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap;margin-bottom:10px;}
-  .filter-tag{
-    font-family:var(--mono);font-size:10.5px;color:var(--text-dim);
-    background:var(--surface-2);border:1px solid var(--border);border-radius:999px;padding:4px 11px;flex:none;
-  }
-  .scatter-note{font-size:11px;color:var(--text-faint);margin-top:10px;line-height:1.6;}
-  .card-sub{font-size:11.5px;color:var(--text-faint);margin-bottom:14px;line-height:1.6;}
-  .legend-row{display:flex;gap:14px;flex-wrap:wrap;font-family:var(--mono);font-size:10.5px;color:var(--text-dim);}
-  .legend-row span{display:inline-flex;align-items:center;gap:5px;}
-  .legend-row i{width:9px;height:9px;border-radius:50%;display:inline-block;}
-  .chart-box{height:380px;position:relative;margin-top:10px;}
-
-  table.heat{width:100%;border-collapse:separate;border-spacing:2px;font-family:var(--mono);font-size:11.5px;}
-  table.heat th,table.heat td{padding:8px 10px;text-align:center;}
-  table.heat th{color:var(--text-dim);font-weight:600;font-size:10.5px;cursor:pointer;white-space:nowrap;}
-  table.heat th:hover{color:var(--text);}
-  table.heat th.sorted{color:var(--accent);}
-  table.heat th:first-child,table.heat td.name-cell{text-align:left;white-space:normal;}
-  table.heat td{border-radius:4px;}
-  .name-cell{font-family:var(--sans) !important;font-size:12px;color:var(--text);cursor:pointer;
-    display:flex;align-items:center;gap:6px;background:transparent !important;}
-  .name-cell .arrow{font-size:9px;color:var(--text-faint);transition:transform .12s ease;}
-  .name-cell.open .arrow{transform:rotate(90deg);color:var(--accent);}
-  .name-cell:hover{color:var(--accent);}
-  .heat-legend{display:flex;align-items:center;gap:8px;margin-top:14px;font-size:10.5px;color:var(--text-faint);}
-  .ramp{width:110px;height:8px;border-radius:4px;background:linear-gradient(90deg,#1b1b28,#60a5fa);}
-
-  .drill-row td{padding:0;border-radius:0;}
-  .drill-box{background:var(--surface-2);border-top:1px solid var(--border);border-bottom:1px solid var(--border);
-    padding:16px 20px;}
-  .drill-title{font-size:12px;font-weight:700;margin-bottom:10px;color:var(--text-dim);}
-  table.daily{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11px;}
-  table.daily th,table.daily td{padding:6px 10px;text-align:right;border-bottom:1px solid var(--border);}
-  table.daily th:first-child,table.daily td:first-child{text-align:left;}
-  table.daily th{color:var(--text-faint);font-weight:600;}
-  table.daily td.na{color:var(--text-faint);}
-
-  @media (max-width:640px){
-    .wrap{padding:24px 16px 48px;}
-    header{align-items:flex-start;}
-    .meta-box{text-align:left;}
-    .refresh-row{justify-content:flex-start;}
-  }
-
-  .modal-backdrop{
-    display:none;position:fixed;inset:0;background:rgba(5,5,9,0.7);
-    align-items:center;justify-content:center;z-index:50;padding:20px;
-  }
-  .modal-backdrop.open{display:flex;}
-  .modal-card{
-    background:var(--surface);border:1px solid var(--border);border-radius:14px;
-    padding:22px;width:100%;max-width:640px;max-height:85vh;overflow-y:auto;
-  }
-  .modal-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:16px;}
-  .modal-controls-row{display:flex;align-items:center;flex-wrap:wrap;gap:10px;}
-
-  .placement-filter{position:relative;}
-  .placement-filter-btn{
-    font-family:var(--mono);font-size:11px;color:var(--text-dim);
-    background:var(--surface-2);border:1px solid var(--border);border-radius:8px;
-    padding:6px 12px;cursor:pointer;
-  }
-  .placement-filter-btn:hover{color:var(--text);border-color:var(--accent);}
-  .placement-filter-btn.has-filter{color:var(--accent);border-color:var(--accent);}
-  .placement-filter-dropdown{
-    display:none;position:absolute;top:calc(100% + 6px);left:0;z-index:40;
-    background:var(--surface);border:1px solid var(--border);border-radius:10px;
-    padding:10px;width:280px;box-shadow:0 8px 24px rgba(0,0,0,0.4);
-  }
-  .placement-filter-dropdown.open{display:block;}
-  .placement-filter-search{
-    width:100%;box-sizing:border-box;margin-bottom:8px;
-    font-family:var(--sans);font-size:12px;color:var(--text);
-    background:var(--surface-2);border:1px solid var(--border);border-radius:7px;padding:6px 10px;
-  }
-  .placement-filter-search:focus{outline:none;border-color:var(--accent);}
-  .placement-filter-search::placeholder{color:var(--text-faint);}
-  .placement-filter-empty{font-size:11.5px;color:var(--text-faint);padding:10px 4px;text-align:center;}
-  .placement-filter-actions{display:flex;gap:8px;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid var(--border);}
-  .placement-filter-actions button{
-    font-family:var(--mono);font-size:10.5px;color:var(--text-dim);background:var(--surface-2);
-    border:1px solid var(--border);border-radius:6px;padding:4px 9px;cursor:pointer;
-  }
-  .placement-filter-actions button:hover{color:var(--text);border-color:var(--accent);}
-  .placement-filter-list{max-height:260px;overflow-y:auto;}
-  .placement-filter-item{display:flex;align-items:center;gap:8px;padding:5px 4px;font-size:12px;color:var(--text);cursor:pointer;border-radius:5px;}
-  .placement-filter-item:hover{background:var(--surface-2);}
-  .placement-filter-item input{flex:none;accent-color:var(--accent);cursor:pointer;}
-  .placement-filter-item span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  .modal-title{font-size:15px;font-weight:700;}
-  .modal-sub{font-size:11.5px;color:var(--text-faint);font-family:var(--mono);margin-top:3px;}
-  .modal-close{
-    background:var(--surface-2);border:1px solid var(--border);border-radius:8px;
-    color:var(--text-dim);width:28px;height:28px;cursor:pointer;font-size:13px;flex:none;
-  }
-  .modal-close:hover{color:var(--text);border-color:var(--accent);}
-  #modalChartBox{height:260px;margin-top:16px;}
-  table.heat td.clickable{cursor:pointer;}
-  .chg{font-weight:700;}
-  .chg.chg-up{color:var(--up);}
-  .chg.chg-down{color:var(--down);}
-  .chg.chg-flat{color:var(--text-faint);}
-  .chg-na{color:var(--text-faint);}
-  table.heat td.chg-cell{background:var(--surface-2);}
-  table.heat td.clickable:hover{outline:1px solid var(--accent);outline-offset:-1px;}
-
-  .seg-caption{font-size:11px;color:var(--text-faint);margin-right:2px;}
-  .split-card{background:var(--surface);border:1px solid var(--border);border-radius:13px;
-    padding:18px 20px;margin:0 0 18px;}
-  .split-head{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap;}
-  .split-label{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--text-dim);margin-bottom:7px;}
-  .split-period{color:var(--text-faint);}
-  .split-total{font-size:27px;font-weight:700;letter-spacing:-.02em;line-height:1.1;}
-  .split-delta{font-family:var(--mono);font-size:11.5px;color:var(--text-faint);text-align:right;padding-top:20px;}
-  .split-delta .up{color:var(--up);} .split-delta .down{color:var(--down);}
-  .split-bar{display:flex;height:12px;border-radius:6px;overflow:hidden;margin:15px 0 12px;background:var(--surface-2);}
-  .split-seg{height:100%;transition:width .25s ease;}
-  .split-seg.seg-ssp{background:var(--c-ssp);}
-  .split-seg.seg-direct{background:var(--c-direct);}
-  .split-legend{display:flex;gap:26px;flex-wrap:wrap;}
-  .sl-item{display:flex;align-items:flex-start;gap:8px;}
-  .sl-dot{width:9px;height:9px;border-radius:50%;margin-top:4px;flex:none;}
-  .sl-top{font-size:13px;}
-  .sl-top b{font-weight:600;}
-  .sl-amt{font-family:var(--mono);font-weight:700;margin-left:3px;}
-  .sl-pct{font-family:var(--mono);font-size:11.5px;color:var(--text-faint);margin-left:3px;}
-  .sl-sub{font-size:10.5px;color:var(--text-faint);margin-top:2px;}
-  @media (max-width:640px){ .split-legend{gap:14px;} .split-delta{text-align:left;padding-top:0;} }
-
-  .reconcile-banner{background:rgba(246,120,158,.10);border:1px solid rgba(246,120,158,.45);
-    border-radius:10px;padding:11px 15px;font-size:12.5px;color:var(--text-dim);
-    margin-bottom:18px;line-height:1.8;}
-  .reconcile-banner b{color:var(--down);}
-  .reconcile-detail{font-family:var(--mono);font-size:11px;color:var(--text-faint);}
-
-  .stop-badge{display:inline-block;font-family:var(--mono);font-size:9.5px;
-    background:rgba(246,120,158,.16);color:var(--down);border-radius:4px;padding:1px 6px;margin-left:6px;}
-  .at-badge{display:inline-block;font-family:var(--mono);font-size:9.5px;border-radius:4px;padding:1px 6px;margin-left:5px;}
-  .at-badge.at-ssp{background:rgba(56,189,248,.16);color:var(--c-ssp);}
-  .at-badge.at-direct{background:rgba(251,191,36,.16);color:var(--c-direct);}
-
-  .mw-section-title{font-size:17px;font-weight:700;margin:36px 0 16px;padding-top:4px;}
-  .mw-section-title:first-of-type{margin-top:0;}
-  .mw-section-sub{font-size:12px;color:var(--text-faint);margin:-12px 0 18px;line-height:1.6;}
-
 </style>
 </head>
 <body>
 <div class="wrap">
 
   <nav class="pagenav">
-    <a href="./index.html">통합 매출</a>
-    <a href="./mobwith.html" class="active">Mobwith 상세</a>
+    <a href="./index.html" class="active">통합 매출</a>
+    <a href="./mobwith.html">Mobwith 상세</a>
     <a href="./apcorn.html">APCORN SSP 상세</a>
   </nav>
 
   <header>
     <div>
-      <div class="eyebrow">Mobwith · Daily & Placement</div>
-      <h1>Mobwith 상세</h1>
-      <div class="subtitle">일별 지표와 지면별 현황 &nbsp;|&nbsp; <b id="dateRange">–</b></div>
+      <div class="eyebrow">Ad Revenue · Vendor Overview</div>
+      <h1>광고 매출 대시보드</h1>
+      <div class="subtitle"><span id="vendorList">–</span> &nbsp;|&nbsp; <b id="dateRange">–</b></div>
     </div>
     <div>
       <div class="meta-box">
-        원본: Mobwith A·B (Google Sheets)<span class="pill">Live</span><br/>
+        원본: 오퍼월 광고 집계 (Google Sheets)<span class="pill">Live</span><br/>
         생성 시각: <span id="generatedAt">–</span>
       </div>
       <div class="refresh-row">
@@ -374,222 +285,114 @@
     </div>
   </header>
 
-  <div class="mw-section-title">Mobwith · 일별 지표</div>
-  <div class="mw-section-sub">기간은 아래 지면별 히트맵과 별개로 선택합니다.</div>
+  <section class="kpi-grid" id="kpiGrid"></section>
 
-  <div class="reconcile-banner" id="mwReconcile" style="display:none"></div>
-
-  <div class="split-card" id="mwaSplit">
-    <div class="split-head">
+  <section class="trend-card">
+    <div id="fxWarnBanner"></div>
+    <div class="trend-head">
       <div>
-        <div class="split-label">정산금액 <span class="split-period" id="splitPeriod">–</span></div>
-        <div class="split-total" id="splitTotal">–</div>
+        <div class="trend-title">일별 매출 추이</div>
+        <div class="trend-sub" id="trendSub">–</div>
       </div>
-      <div class="split-delta" id="splitDelta"></div>
-    </div>
-    <div class="split-bar" id="splitBar">
-      <div class="split-seg seg-ssp" id="barSsp"></div>
-      <div class="split-seg seg-direct" id="barDirect"></div>
-    </div>
-    <div class="split-legend">
-      <div class="sl-item">
-        <span class="sl-dot" style="background:var(--c-ssp)"></span>
-        <div>
-          <div class="sl-top"><b>SSP</b> <span class="sl-amt" id="legSsp">–</span> <span class="sl-pct" id="pctSsp"></span></div>
-          <div class="sl-sub">통합매출에 반영</div>
-        </div>
-      </div>
-      <div class="sl-item">
-        <span class="sl-dot" style="background:var(--c-direct)"></span>
-        <div>
-          <div class="sl-top"><b>직광고</b> <span class="sl-amt" id="legDirect">–</span> <span class="sl-pct" id="pctDirect"></span></div>
-          <div class="sl-sub">통합매출에서 제외</div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-
-  <div class="controls-row">
-    <div class="period-label" id="mwa-periodLabel">기간: –</div>
-    <div class="controls">
-      <span class="seg-caption">아래 지표 기준</span>
-      <div class="seg" id="mwaSeriesSeg">
-        <button data-s="all" class="active">전체</button>
-        <button data-s="ssp">SSP</button>
-        <button data-s="direct">직광고</button>
-      </div>
-      <div class="seg" id="mwa-presetSeg">
-        <button data-preset="mtd" class="active">이번 달</button>
-        <button data-preset="1">최근 1일</button>
-        <button data-preset="7">7일</button>
-        <button data-preset="14">14일</button>
-        <button data-preset="30">30일</button>
-        <button data-preset="all">전체</button>
-      </div>
-      <div class="date-range">
-        <input type="date" id="mwa-startInput" aria-label="시작일" />
-        <span>–</span>
-        <input type="date" id="mwa-endInput" aria-label="종료일" />
-      </div>
-    </div>
-  </div>
-
-  <section class="kpi-grid" id="mwa-kpiGrid"></section>
-
-  <section class="chart-grid" id="mwa-chartGrid"></section>
-
-  <section class="table-card">
-    <div class="table-title">일별 데이터</div>
-    <div id="mwa-tableWrap"><table class="datatable" id="mwa-dataTable"></table></div>
-  </section>
-
-  <div class="mw-section-title">Mobwith B · 지면별 현황</div>
-  <div class="mw-section-sub">기간은 위 Mobwith A와 별개로 선택합니다.</div>
-
-
-  <div class="controls-row">
-    <div class="period-label" id="mwb-periodLabel">기간: –</div>
-    <div class="seg" id="mwb-presetSeg">
-      <button data-p="1">최근 1일</button>
-      <button data-p="7" class="active">7일</button>
-      <button data-p="all">전체</button>
-    </div>
-    <div class="date-range">
-      <input type="date" id="mwb-startInput" aria-label="시작일" />
-      <span>–</span>
-      <input type="date" id="mwb-endInput" aria-label="종료일" />
-    </div>
-    <div class="placement-filter">
-      <button type="button" id="mwb-placementFilterBtn" class="placement-filter-btn">
-        지면 선택 <span id="mwb-placementFilterCount">(전체)</span>
-      </button>
-      <div class="placement-filter-dropdown" id="mwb-placementFilterDropdown">
-        <input type="text" class="placement-filter-search" id="mwb-placementSearch"
-               placeholder="지면 이름 검색" autocomplete="off" />
-        <div class="placement-filter-actions">
-          <button type="button" id="mwb-placementSelectAll">전체 선택</button>
-          <button type="button" id="mwb-placementSelectNone">전체 해제</button>
-        </div>
-        <div class="placement-filter-list" id="mwb-placementFilterList"></div>
-        <div class="placement-filter-empty" id="mwb-placementNoMatch" style="display:none">검색 결과가 없습니다.</div>
-      </div>
-    </div>
-  </div>
-
-  <section class="card">
-    <div class="card-head">
-      <div>
-        <div class="card-title">지면별 지표 히트맵</div>
-        <div class="card-sub">색은 <b style="color:var(--text-dim)">현재 필터·기간 안에서의</b> 순위(백분위)입니다. <b style="color:var(--text-dim)">지면명을 클릭하면</b> 일자별 표가 펼쳐지고, <b style="color:var(--text-dim)">숫자를 클릭하면</b> 그 지표의 일별 추이가 팝업으로 뜹니다.</div>
-      </div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-        <div class="seg" id="mwbAdTypeSeg"></div>
-        <div class="seg" id="mwb-osSegHeat">
-          <button data-os="all" class="active">전체</button>
-          <button data-os="Android">Android</button>
-          <button data-os="IOS">iOS</button>
-        </div>
-      </div>
-    </div>
-    <table class="heat" id="mwb-heatTable"></table>
-    <div class="heat-legend">낮음<span class="ramp"></span>높음 (해당 지표 1위)</div>
-  </section>
-
-  <section class="card">
-    <div class="card-head">
-      <div class="card-title">규모 × 효율 분포</div>
-      <div class="seg" id="mwb-osSegScatter">
-        <button data-os="all" class="active">전체</button>
-        <button data-os="Android">Android</button>
-        <button data-os="IOS">iOS</button>
-      </div>
-    </div>
-    <div class="legend-row">
-      <span><i style="background:#5ee6a4"></i>규모·효율 모두 우수</span>
-      <span><i style="background:#f6b860"></i>규모 크나 효율 낮음</span>
-      <span><i style="background:#60a5fa"></i>효율 좋으나 규모 작음</span>
-      <span><i style="background:#6b6980"></i>둘 다 낮음</span>
-    </div>
-    <div class="chart-box"><canvas id="mwb-scatterCanvas"></canvas></div>
-    <div class="scatter-note" id="mwb-scatterNote"></div>
-  </section>
-
-  <div class="modal-backdrop" id="mwb-modalBackdrop">
-    <div class="modal-card">
-      <div class="modal-head">
-        <div>
-          <div class="modal-title" id="mwb-modalTitle">–</div>
-          <div class="modal-sub" id="mwb-modalSub">–</div>
-        </div>
-        <button class="modal-close" id="mwb-modalClose" aria-label="닫기">✕</button>
-      </div>
-      <div class="modal-controls-row">
-        <div class="seg" id="mwb-modalPresetSeg">
-          <button data-p="1">최근 1일</button>
-          <button data-p="7">7일</button>
-          <button data-p="14">14일</button>
-          <button data-p="all">전체</button>
+      <div class="controls">
+        <div class="seg" id="presetSeg">
+          <button data-preset="mtd" class="active">이번 달</button>
+          <button data-preset="lastmonth">저번 달</button>
+          <button data-preset="all">전체</button>
+          <button data-preset="30">30일</button>
+          <button data-preset="14">14일</button>
+          <button data-preset="7">7일</button>
         </div>
         <div class="date-range">
-          <input type="date" id="mwb-modalStartInput" aria-label="시작일" />
+          <input type="date" id="startInput" aria-label="시작일" />
           <span>–</span>
-          <input type="date" id="mwb-modalEndInput" aria-label="종료일" />
+          <input type="date" id="endInput" aria-label="종료일" />
+        </div>
+        <div class="seg" id="scaleSeg">
+          <button data-scale="linear" class="active">선형</button>
+          <button data-scale="logarithmic">로그</button>
         </div>
       </div>
-      <div class="chart-box" id="mwb-modalChartBox"><canvas id="mwb-modalCanvas"></canvas></div>
     </div>
+    <div class="chart-box">
+      <canvas id="trendCanvas"></canvas>
+      <div id="chartErrorBox" class="chart-error-box" style="display:none;"></div>
+    </div>
+    <div class="series-bar">
+      <div class="series-toggles" id="seriesToggles"></div>
+      <div class="series-actions">
+      </div>
+    </div>
+    <div class="trend-foot">
+      <span class="hint">항목을 클릭하면 그래프에서 켜고 끌 수 있습니다.</span>
+      <span id="scaleHint"></span>
+    </div>
+  </section>
+
+  <div class="notes">
+    <div class="notes-title">데이터 참고 사항</div>
+    <ul>
+      <li><b>중복 날짜 자동 정리</b> — 같은 날짜가 여러 행으로 기록된 경우 자동으로 1건으로 정리해 집계합니다.</li>
+      <li><b>매출 컬럼 부재</b> — APCORN_SSP·ADOP 시트는 별도 '매출' 컬럼이 없어 media_cost / mediaRevNo 값을 사용합니다. 매출/비용 여부는 원본 기준 확인이 필요합니다.</li>
+      <li><b>USD→KRW 환산</b> — APCORN_SSP·ADOP는 원본이 USD라, 각 날짜의 Frankfurter(ECB 기준) 당일 환율로 원화 환산해 표시합니다. 주말·공휴일처럼 환율이 발표되지 않는 날은 직전 영업일 환율을 사용합니다. 카드의 작은 글씨가 환산에 쓰인 원본 USD 값과 환율입니다.</li>
+      <li><b>벤더 간 규모 차이</b> — NBT 애디슨이 다른 벤더보다 매출 규모가 훨씬 커서, 선형 축에서는 나머지 벤더의 추이가 눌려 보입니다. 작은 벤더의 증감을 볼 때는 <b>로그</b> 축으로 전환하거나 차트 아래 토글에서 NBT·합계를 잠시 꺼 두세요.</li>
+      <li><b>합계 선</b> — 현재 켜져 있는 항목만 더한 값입니다. 항목을 끄면 합계도 다시 계산되고, 켜진 항목이 1개 이하일 때는 그 항목과 겹치므로 합계를 표시하지 않습니다.</li>
+      <li><b>칩의 합계와 일수</b> — 각 항목 칩에 선택 기간의 합계 금액과, 실제로 데이터가 있는 일수를 함께 표시합니다. 벤더마다 수집 시작일이 달라(예: Mobwith A는 8/1부터) 금액만으로 규모를 비교하면 오해할 수 있기 때문입니다.</li>
+      <li>상단 카드의 값은 항상 <b>가장 최근 일자</b> 기준이며, '선택 기간 합계'만 아래 기간 필터를 따릅니다.</li>
+    </ul>
   </div>
 
 </div>
 
 <script>
-// 음수 KRW 값을 "-₩1,234"로 표기(부호가 화폐기호 뒤로 가는 걸 방지) — 두 구획이
-// 각자 다른 숫자 포맷터 변수를 쓰므로, 공유 헬퍼는 자체 포맷터를 따로 둔다.
-const _krwFmt = new Intl.NumberFormat('ko-KR', {maximumFractionDigits:0});
-function fmtKrwPlain(v){
-  const roundedAbs = Math.round(Math.abs(v));
-  const sign = (v < 0 && roundedAbs !== 0) ? '-' : '';
-  return sign + '₩' + _krwFmt.format(Math.abs(v));
-}
-function fmtKrw(v){ return v == null ? '–' : fmtKrwPlain(v); }
-
-const MobwithA = (function(){
-
 const numFmt0 = new Intl.NumberFormat('ko-KR', {maximumFractionDigits:0});
-const numFmt1 = new Intl.NumberFormat('ko-KR', {maximumFractionDigits:1});
 const numFmt2 = new Intl.NumberFormat('ko-KR', {maximumFractionDigits:2});
-
-const METRICS = [
-  {key:'impressions', label:'노출수',     fmt: v => v==null?'–':numFmt0.format(v)},
-  {key:'clicks',      label:'클릭수',     fmt: v => v==null?'–':numFmt0.format(v)},
-  {key:'ctr',         label:'CTR',       fmt: v => v==null?'–':numFmt2.format(v*100)+'%'},
-  {key:'cpc',         label:'CPC',       fmt: v => fmtKrw(v)},
-  {key:'revenue',     label:'정산금액',   fmt: v => fmtKrw(v)},
-  {key:'ecpm',        label:'eCPM',      fmt: v => fmtKrw(v)},
-];
-
+function fmt(v){
+  if (v === null || v === undefined) return '–';
+  return Math.abs(v) >= 1000 ? numFmt0.format(v) : numFmt2.format(v);
+}
+function fmtAxis(v){
+  const a = Math.abs(v);
+  if (a >= 100000000) return (v/100000000).toFixed(1) + '억';
+  if (a >= 10000) return Math.round(v/10000) + '만';
+  return numFmt0.format(v);
+}
 function shortDate(d){ return d.slice(5).replace('-', '/'); }
 function getVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
 
+const colorMap = {
+  NBT_Adison: getVar('--c-nbt'),
+  Buzzvil: getVar('--c-buzzvil'),
+  APCORN_SSP: getVar('--c-apcorn'),
+  ADOP: getVar('--c-adop'),
+  'Mobwith A': getVar('--c-mobwith-a'),
+  ADPOPCORN_Offerwall: getVar('--c-adpopcorn-ofw'),
+};
+
+const kpiGrid = document.getElementById('kpiGrid');
 let PAYLOAD = null;
-let startIdx = 0, endIdx = 0, activePreset = '1';
-let charts = [];
+let trendChart = null;
+let startIdx = 0, endIdx = 0;
+let scaleMode = 'linear';
+let activePreset = 'all';
+// 5개 계열(4개 벤더 + 합계)의 표시 여부 — 기간/축을 바꿔도 유지됨
+let seriesVisible = {};
 
-function clampIndices(){
-  const n = PAYLOAD.dates.length;
-  startIdx = Math.max(0, Math.min(startIdx, n - 1));
-  endIdx = Math.max(startIdx, Math.min(endIdx, n - 1));
-}
+/* ---------- KPI ---------- */
+const TOTAL_KEY = '__total__';
+const GROUP_LABELS = { Offerwall: 'Offerwall', AdNetwork: 'AdNetwork' };
+const GROUP_ORDER = ['Offerwall', 'AdNetwork'];
 
-// 저번 달 같은 기간 비교용 (예: 9/1~9/7 -> 8/1~8/7). 저번 달에 없는 날짜(3/31 등)는
-// 그 달 마지막 날로 당긴다.
+// 주어진 기간(startStr~endStr)의 '저번 달 같은 날짜' 구간에 해당하는 인덱스 범위를 찾는다.
+// 3/31처럼 저번 달에 없는 날짜는 그 달 마지막 날로 당긴다(2월이면 28/29일).
+// 데이터가 없는 구간이면 null을 돌려주고, 호출부는 비교를 생략한다.
 function shiftMonth(dateStr){
   const [y, m, d] = dateStr.split('-').map(Number);
   let py = y, pm = m - 1;
   if (pm === 0){ pm = 12; py = y - 1; }
-  const lastDay = new Date(py, pm, 0).getDate();
-  return `${py}-${String(pm).padStart(2,'0')}-${String(Math.min(d, lastDay)).padStart(2,'0')}`;
+  const lastDay = new Date(py, pm, 0).getDate();   // pm월의 마지막 날
+  const pd = Math.min(d, lastDay);
+  return `${py}-${String(pm).padStart(2,'0')}-${String(pd).padStart(2,'0')}`;
 }
 function prevMonthRange(startStr, endStr, dates){
   const ps = shiftMonth(startStr), pe = shiftMonth(endStr);
@@ -600,17 +403,429 @@ function prevMonthRange(startStr, endStr, dates){
   return s === -1 ? null : [s, e];
 }
 
+function renderKpis(){
+  kpiGrid.innerHTML = '';
+  const {vendors, dates} = PAYLOAD;
+  const n = endIdx - startIdx + 1;
+
+  // 환율 변환이 실패해 USD 원본으로 남은 벤더는 원화 합계에 섞을 수 없다.
+  const krwKeys = Object.keys(vendors).filter(k => vendors[k].currency === 'KRW');
+  const usdLeft = Object.keys(vendors).filter(k => vendors[k].currency !== 'KRW');
+
+  const sumRange = (key, s, e) => {
+    let sum = 0, any = false;
+    for (let i = s; i <= e; i++){
+      const v = vendors[key].data[i];
+      if (v !== null && v !== undefined){ sum += v; any = true; }
+    }
+    return any ? sum : null;
+  };
+  const sumKeys = (keys, s, e) => {
+    let sum = 0, any = false;
+    keys.forEach(k => { const v = sumRange(k, s, e); if (v !== null){ sum += v; any = true; } });
+    return any ? sum : null;
+  };
+
+  // 비교 기준 = '저번 달 같은 기간'. 예를 들어 9/1~9/7을 보고 있으면 8/1~8/7과 비교한다.
+  // (직전 N일과 비교하면 월 초에는 지난달 말과 섞여 비교가 애매해진다)
+  const prevRange = prevMonthRange(dates[startIdx], dates[endIdx], dates);
+  const changeHtml = (cur, keys) => {
+    if (!prevRange || cur === null) return '';
+    const prev = sumKeys(keys, prevRange[0], prevRange[1]);
+    if (prev === null || prev <= 0) return '';
+    const ch = ((cur / prev) - 1) * 100;
+    return `<span class="${ch >= 0 ? 'arrow-up' : 'arrow-down'}">${ch >= 0 ? '▲' : '▼'} ${Math.abs(ch).toFixed(1)}%</span>`;
+  };
+
+  const total = sumKeys(krwKeys, startIdx, endIdx);
+
+  // ① 전체 (가장 크게)
+  const hero = document.createElement('div');
+  hero.className = 'sum-hero';
+  const chgAll = changeHtml(total, krwKeys);
+  const avg = (total !== null && n) ? total / n : null;
+  hero.innerHTML =
+    `<div class="sh-label">전체 매출 · ${dates[startIdx]} ~ ${dates[endIdx]} (${n}일)</div>` +
+    `<div class="sh-value">${total === null ? '–' : fmt(total)}</div>` +
+    `<div class="sh-meta">${chgAll ? chgAll + ` <span class="sh-dim">저번 달 같은 기간 대비</span> &nbsp;·&nbsp; ` : ''}` +
+    `<span class="sh-dim">일평균 ${avg === null ? '–' : fmt(avg)}</span>` +
+    (usdLeft.length ? ` &nbsp;·&nbsp; <span class="sh-warn">환율 미확보 ${usdLeft.length}곳 제외</span>` : '') +
+    `</div>`;
+  kpiGrid.appendChild(hero);
+
+  // ② 두 사업
+  const two = document.createElement('div');
+  two.className = 'sum-two';
+  GROUP_ORDER.forEach(g => {
+    const keys = krwKeys.filter(k => vendors[k].group === g);
+    if (!keys.length) return;
+    const amt = sumKeys(keys, startIdx, endIdx);
+    const share = (total && amt !== null) ? (amt / total * 100) : null;
+    const card = document.createElement('div');
+    card.className = 'sum-gcard ' + (g === 'Offerwall' ? 'is-ow' : 'is-an');
+    card.innerHTML =
+      `<div class="sg-label">${GROUP_LABELS[g]}</div>` +
+      `<div class="sg-value">${amt === null ? '–' : fmt(amt)}</div>` +
+      `<div class="sg-meta">` +
+        (share === null ? '' : `<span>비중 ${share.toFixed(1)}%</span>`) +
+        (changeHtml(amt, keys) || '') +
+      `</div>`;
+    two.appendChild(card);
+  });
+  kpiGrid.appendChild(two);
+
+  // ③ 업체별 — 카드 대신 막대 있는 순위 목록 (규모 차이가 즉시 보이고 공간도 덜 쓴다)
+  const rows = krwKeys.map(k => ({key: k, label: vendors[k].label,
+                                  amt: sumRange(k, startIdx, endIdx) })).
+                filter(r => r.amt !== null).sort((a, b) => b.amt - a.amt);
+  if (rows.length){
+    const maxAmt = Math.max(...rows.map(r => r.amt), 1);
+    const list = document.createElement('div');
+    list.className = 'sum-list';
+    list.innerHTML = '<div class="sl-head"><div>업체</div><div>비중</div><div>기간 합계</div><div>저번 달 대비</div></div>' +
+      rows.map(r => {
+        const share = total ? (r.amt / total * 100) : 0;
+        return `<div class="sl-row">` +
+          `<div class="sl-name"><span class="sl-dot" style="background:${colorMap[r.key]}"></span>` +
+            `<span class="sl-vlabel">${r.label}</span>` +
+            `<span class="sl-grp ${vendors[r.key].group === 'Offerwall' ? 'is-ow' : 'is-an'}">${GROUP_LABELS[vendors[r.key].group]}</span></div>` +
+          `<div class="sl-bar"><i style="width:${Math.max(0, r.amt / maxAmt * 100)}%;background:${colorMap[r.key]}"></i></div>` +
+          `<div class="sl-amt">${fmt(r.amt)}</div>` +
+          `<div class="sl-chg">${changeHtml(r.amt, [r.key]) || '<span class="sh-dim">–</span>'}</div>` +
+        `</div>`;
+      }).join('');
+    kpiGrid.appendChild(list);
+  }
+}
+
+
+const GROUP_KEY_PREFIX = '__group__';
+
+function buildDatasets(){
+  const {dates, vendors} = PAYLOAD;
+  const labels = dates.slice(startIdx, endIdx + 1);
+
+  // 통화가 섞이면 한 축에 못 그리므로 KRW 계열만 통합 차트에 포함
+  const krwKeys = Object.keys(vendors).filter(k => vendors[k].currency === 'KRW');
+  const excluded = Object.keys(vendors).filter(k => vendors[k].currency !== 'KRW');
+
+  // 어떤 보기 방식이든 '칩으로 켜둔 벤더'만 합산 대상에 넣는다.
+  // 즉 칩은 '합계에 포함할지'를 뜻하고, 보기 방식은 '무엇을 선으로 그릴지'를 뜻한다.
+  const onKeys = krwKeys.filter(k => seriesVisible[k] !== false);
+
+  // 주어진 벤더 목록의 날짜별 합계 (모두 결측인 날은 null로 남겨 선을 끊는다)
+  const sumOf = keys => labels.map((_, i) => {
+    let s = null;
+    keys.forEach(key => {
+      const val = vendors[key].data[startIdx + i];
+      if (val !== null) s = (s === null ? 0 : s) + val;
+    });
+    return s;
+  });
+
+  const aggLine = (label, key, data, color, extra = {}) => Object.assign({
+    label, _key: key, data,
+    borderColor: color, backgroundColor: color,
+    spanGaps: false, tension: 0,
+    borderWidth: 1.8, borderDash: [5, 4],  // 합계선은 점선 — 개별 선과 성격이 다름을 표시
+    pointRadius: 0, pointHoverRadius: 5,
+    hidden: seriesVisible[key] === false,
+    _usd: null,
+  }, extra);
+
+  // 켠 것이 그대로 그려지는 방식 — 별도의 '보기 모드'가 없다.
+  // 개별 업체 선 + (켰다면) 묶음 합계선 + (켰다면) 전체 합계선.
+  const datasets = [];
+
+  krwKeys.forEach(key => {
+    if (seriesVisible[key] === false) return;
+    const v = vendors[key];
+    datasets.push({
+      label: v.label,
+      _key: key,
+      data: v.data.slice(startIdx, endIdx + 1),
+      borderColor: colorMap[key],
+      backgroundColor: colorMap[key],
+      spanGaps: false,
+      tension: 0,
+      borderWidth: 2,
+      pointRadius: labels.length <= 31 ? 2.5 : 0,
+      pointHoverRadius: 5,
+      hidden: false,
+      _usd: v.converted ? v.dataUsd.slice(startIdx, endIdx + 1) : null,
+    });
+  });
+
+  GROUP_ORDER.forEach(g => {
+    const key = GROUP_KEY_PREFIX + g;
+    if (seriesVisible[key] === false || seriesVisible[key] === undefined) return;
+    const keys = krwKeys.filter(k => vendors[k].group === g);
+    if (!keys.length) return;
+    datasets.push(aggLine(GROUP_LABELS[g] + ' 합계', key, sumOf(keys),
+      getVar(g === 'Offerwall' ? '--c-grp-offerwall' : '--c-grp-adnetwork'),
+      {_onCount: keys.length}));
+  });
+
+  if (seriesVisible[TOTAL_KEY] === true){
+    datasets.push(aggLine('전체 합계', TOTAL_KEY, sumOf(krwKeys), getVar('--c-total'),
+      {_onCount: krwKeys.length}));
+  }
+
+  return {labels, datasets, excluded};
+}
+
+// 계열 토글 칩 — 차트의 표시 여부와 항상 동기화하고, 선택 기간의 합계를 함께 보여줌
+function renderSeriesToggles(datasets){
+  const box = document.getElementById('seriesToggles');
+  box.innerHTML = '';
+
+  const {vendors} = PAYLOAD;
+  const krwKeys = Object.keys(vendors).filter(k => vendors[k].currency === 'KRW');
+
+  // 기간 합계와 데이터 일수 (벤더마다 수집 시작일이 달라, 금액만 나란히 보면 규모를 오해할 수 있어서)
+  const statsOf = arr => {
+    let sum = 0, days = 0;
+    arr.forEach(v => { if (v !== null && v !== undefined){ sum += v; days++; } });
+    return {sum, days};
+  };
+  const sliceOf = key => vendors[key].data.slice(startIdx, endIdx + 1);
+  const sumSeries = keys => {
+    const out = [];
+    for (let i = startIdx; i <= endIdx; i++){
+      let s = null;
+      keys.forEach(k => { const v = vendors[k].data[i]; if (v !== null) s = (s === null ? 0 : s) + v; });
+      out.push(s);
+    }
+    return out;
+  };
+
+  const makeChip = ({key, label, color, data, dashed, metaText}) => {
+    const on = key === TOTAL_KEY || key.startsWith(GROUP_KEY_PREFIX)
+      ? seriesVisible[key] === true          // 합계선은 기본 꺼짐 (개별 선이 눌리지 않도록)
+      : seriesVisible[key] !== false;        // 업체는 기본 켜짐
+    const {sum, days} = statsOf(data);
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'series-chip' + (dashed ? ' is-dashed' : '');
+    btn.dataset.key = key;
+    btn.setAttribute('aria-pressed', String(on));
+    btn.style.setProperty('--chip-color', color);
+    btn.innerHTML = `<span class="swatch"></span><span>${label}</span>` +
+      `<span class="chip-sum">${days ? '₩' + numFmt0.format(sum) : '–'}</span>` +
+      `<span class="chip-days">${metaText != null ? metaText : days + '일'}</span>`;
+    return btn;
+  };
+
+  GROUP_ORDER.forEach(g => {
+    const keys = krwKeys.filter(k => vendors[k].group === g);
+    if (!keys.length) return;
+    const allOn = keys.every(k => seriesVisible[k] !== false);
+
+    const wrap = document.createElement('div');
+    wrap.className = 'chip-group';
+    const head = document.createElement('div');
+    head.className = 'chip-group-title';
+    head.innerHTML =
+      `<span class="cg-bar" style="background:${getVar(g === 'Offerwall' ? '--c-grp-offerwall' : '--c-grp-adnetwork')}"></span>` +
+      `${GROUP_LABELS[g]}` +
+      `<button type="button" class="cg-all" data-group="${g}" aria-pressed="${allOn}">모두 켜기</button>`;
+    wrap.appendChild(head);
+
+    const row = document.createElement('div');
+    row.className = 'chip-group-items';
+    keys.forEach(key => {
+      row.appendChild(makeChip({key, label: vendors[key].label,
+                                color: colorMap[key], data: sliceOf(key)}));
+    });
+    // 묶음 합계 칩 — 개별 업체와 성격이 다르므로 점선 스와치로 구분
+    row.appendChild(makeChip({
+      key: GROUP_KEY_PREFIX + g,
+      label: GROUP_LABELS[g] + ' 합계',
+      color: getVar(g === 'Offerwall' ? '--c-grp-offerwall' : '--c-grp-adnetwork'),
+      data: sumSeries(keys), dashed: true, metaText: keys.length + '곳',
+    }));
+    wrap.appendChild(row);
+    box.appendChild(wrap);
+  });
+
+  // 전체 합계
+  const wrap2 = document.createElement('div');
+  wrap2.className = 'chip-group';
+  const head2 = document.createElement('div');
+  head2.className = 'chip-group-title';
+  head2.innerHTML = '<span class="cg-bar" style="background:var(--c-total)"></span>전체';
+  wrap2.appendChild(head2);
+  const row2 = document.createElement('div');
+  row2.className = 'chip-group-items';
+  row2.appendChild(makeChip({
+    key: TOTAL_KEY, label: '전체 합계', color: getVar('--c-total'),
+    data: sumSeries(krwKeys), dashed: true, metaText: krwKeys.length + '곳',
+  }));
+  wrap2.appendChild(row2);
+  box.appendChild(wrap2);
+}
+
+
+function renderTrend(){
+ try {
+  const {dates} = PAYLOAD;
+  const {labels, datasets, excluded} = buildDatasets();
+
+  document.getElementById('trendSub').textContent =
+    `${labels[0]} – ${labels[labels.length-1]} · ${labels.length}일 · 원(KRW) 기준`;
+
+  document.getElementById('scaleHint').textContent =
+    scaleMode === 'logarithmic' ? '로그 축: 증감률 비교에 적합' : '선형 축: 절대 규모 비교에 적합';
+
+  document.getElementById('fxWarnBanner').innerHTML = excluded.length
+    ? `<div class="fx-warn-banner">환율 조회에 실패해 ${excluded.map(k=>PAYLOAD.vendors[k].label).join(' · ')}은(는) USD 원본 값이라 통합 차트에서 제외했습니다. 잠시 후 새로고침하면 원화로 합쳐집니다.</div>`
+    : '';
+
+  const canvasEl = document.getElementById('trendCanvas');
+  canvasEl.style.display = '';
+  const msgBox = document.getElementById('chartErrorBox');
+  msgBox.style.display = 'none';
+  msgBox.classList.remove('is-empty');
+
+  renderSeriesToggles(datasets);
+
+  // 모두 숨김 상태면 빈 축만 남아 혼란스러우므로 안내를 띄움
+  const anyVisible = datasets.some(d => !d.hidden);
+  if (!anyVisible){
+    if (trendChart) { trendChart.destroy(); trendChart = null; }
+    canvasEl.style.display = 'none';
+    msgBox.style.display = 'block';
+    msgBox.classList.add('is-empty');
+    msgBox.textContent = '표시할 항목이 없습니다. 아래에서 보고 싶은 항목을 선택해 주세요.';
+    return;
+  }
+
+  const tickEvery = Math.max(1, Math.ceil(labels.length / 10));
+
+  if (trendChart) trendChart.destroy();
+  const ctx = canvasEl.getContext('2d');
+
+  trendChart = new Chart(ctx, {
+    type: 'line',
+    data: {labels: labels.map(shortDate), datasets},
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: {mode:'index', intersect:false},
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#1e1e2c',
+          borderColor: '#33334a',
+          borderWidth: 1,
+          titleFont: {family:"'JetBrains Mono',monospace", size:11},
+          bodyFont: {family:"'JetBrains Mono',monospace", size:11},
+          padding: 11,
+          callbacks: {
+            title: (items) => labels[items[0].dataIndex],
+            label: (item) => {
+              if (item.parsed.y === null) return `${item.dataset.label}: 데이터 없음`;
+              let s = `${item.dataset.label}: ₩${fmt(item.parsed.y)}`;
+              const usd = item.dataset._usd;
+              if (usd && usd[item.dataIndex] !== null && usd[item.dataIndex] !== undefined){
+                s += ` ($${numFmt2.format(usd[item.dataIndex])})`;
+              }
+              return s;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: {display:false},
+          ticks: {
+            color:'#54526a',
+            font:{family:"'JetBrains Mono',monospace", size:9.5},
+            maxRotation:0,
+            autoSkip:false,
+            callback: function(val, i){
+              return (i % tickEvery === 0 || i === labels.length - 1) ? this.getLabelForValue(val) : '';
+            }
+          },
+          border: {color:'#282836'},
+        },
+        y: {
+          type: scaleMode,
+          grid: {color:'#20202c'},
+          ticks: {
+            color:'#54526a',
+            font:{family:"'JetBrains Mono',monospace", size:9.5},
+            callback: (val) => fmtAxis(val),
+          },
+          border: {display:false},
+        }
+      }
+    }
+  });
+ } catch (err) {
+  if (trendChart) { try { trendChart.destroy(); } catch(e){} trendChart = null; }
+  const canvasEl = document.getElementById('trendCanvas');
+  if (canvasEl) canvasEl.style.display = 'none';
+  const box = document.getElementById('chartErrorBox');
+  box.classList.remove('is-empty');
+  box.style.display = 'block';
+  box.textContent = '차트를 그리는 중 문제가 발생했습니다 (' + (err && err.message ? err.message : err) + '). 새로고침 버튼을 눌러보시고, 계속되면 알려주세요.';
+  console.error('renderTrend failed:', err);
+ }
+}
+
+function renderAll(){
+  renderKpis();
+  renderTrend();
+}
+
+/* ---------- 기간 필터 ---------- */
+function clampIndices(){
+  const n = PAYLOAD.dates.length;
+  startIdx = Math.max(0, Math.min(startIdx, n - 1));
+  endIdx = Math.max(startIdx, Math.min(endIdx, n - 1));
+}
+
+// '이번 달' = 데이터상 가장 최신 날짜가 속한 달의 1일(또는 데이터 시작일) ~ 최신 날짜.
+// 실제 오늘 날짜가 아니라 데이터 기준으로 계산 — 수집이 하루이틀 밀려도 다른 프리셋들과
+// 기준이 어긋나지 않는다.
+function computeMtdRange(dates){
+  const n = dates.length;
+  const latestMonth = dates[n-1].slice(0, 7); // 'YYYY-MM'
+  let s = n - 1;
+  for (let i = n - 1; i >= 0; i--){
+    if (dates[i].slice(0, 7) === latestMonth) s = i; else break;
+  }
+  return [s, n - 1];
+}
+
+// '저번 달' = 데이터상 최신 날짜가 속한 달의 바로 전 달 전체(1일~말일). 그 달의
+// 데이터가 아예 없으면(예: 이번 달에 막 시작한 벤더) null을 반환한다.
+function computeLastMonthRange(dates){
+  const n = dates.length;
+  const [y, m] = dates[n-1].slice(0, 7).split('-').map(Number);
+  let py = y, pm = m - 1;
+  if (pm === 0){ pm = 12; py = y - 1; }
+  const prevYm = py + '-' + String(pm).padStart(2, '0');
+  let s = -1, e = -1;
+  for (let i = 0; i < n; i++){
+    if (dates[i].slice(0, 7) === prevYm){ if (s === -1) s = i; e = i; }
+  }
+  return s === -1 ? null : [s, e];
+}
+
 function applyPreset(preset){
   activePreset = preset;
   const n = PAYLOAD.dates.length;
-  endIdx = n - 1;
   if (preset === 'mtd'){
-    // 이번 달 누적 — 데이터상 최신 날짜가 속한 달의 1일부터
-    const ym = PAYLOAD.dates[n-1].slice(0, 7);
-    let s = n - 1;
-    for (let i = n - 1; i >= 0; i--){ if (PAYLOAD.dates[i].slice(0,7) === ym) s = i; else break; }
-    startIdx = s;
+    const [s, e] = computeMtdRange(PAYLOAD.dates);
+    startIdx = s; endIdx = e;
+  } else if (preset === 'lastmonth'){
+    const range = computeLastMonthRange(PAYLOAD.dates);
+    if (range){ startIdx = range[0]; endIdx = range[1]; }
+    else { startIdx = 0; endIdx = 0; } // 저번 달 데이터가 아예 없으면 가장 이른 날 하루로 대체
   } else {
+    endIdx = n - 1;
     startIdx = (preset === 'all') ? 0 : Math.max(0, n - parseInt(preset, 10));
   }
   clampIndices();
@@ -619,1024 +834,191 @@ function applyPreset(preset){
 }
 
 function syncInputs(){
-  document.getElementById('mwa-startInput').value = PAYLOAD.dates[startIdx];
-  document.getElementById('mwa-endInput').value = PAYLOAD.dates[endIdx];
-  document.querySelectorAll('#mwa-presetSeg button').forEach(b => {
+  document.getElementById('startInput').value = PAYLOAD.dates[startIdx];
+  document.getElementById('endInput').value = PAYLOAD.dates[endIdx];
+  document.querySelectorAll('#presetSeg button').forEach(b => {
     b.classList.toggle('active', b.dataset.preset === activePreset);
   });
 }
 
 function onDateInputChange(){
   const dates = PAYLOAD.dates;
-  const sVal = document.getElementById('mwa-startInput').value;
-  const eVal = document.getElementById('mwa-endInput').value;
+  const sVal = document.getElementById('startInput').value;
+  const eVal = document.getElementById('endInput').value;
+
+  // 입력값 이상(以上)인 첫 날짜 / 이하(以下)인 마지막 날짜로 스냅.
+  // 값을 비운 경우엔 해당 방향의 끝으로 되돌림.
   let s = 0;
-  if (sVal){ s = dates.findIndex(d => d >= sVal); if (s === -1) s = dates.length - 1; }
+  if (sVal){
+    s = dates.findIndex(d => d >= sVal);
+    if (s === -1) s = dates.length - 1;
+  }
   let e = dates.length - 1;
-  if (eVal){ e = -1; for (let i = dates.length-1;i>=0;i--){ if (dates[i] <= eVal){ e=i; break; } } if (e===-1) e=0; }
-  if (s > e){ const t=s; s=e; e=t; }
-  startIdx = s; endIdx = e; activePreset = null;
-  clampIndices(); syncInputs(); renderAll();
-}
-
-// 기간 합계 → 여기서 CTR/CPC/eCPM을 다시 계산 (일별 비율의 단순평균이 아니라
-// 노출수·클릭수·정산금액의 합에서 도출한 가중평균이 되도록)
-// 현재 선택된 계열(전체/SSP/직광고). 데이터는 payload.series.{all|ssp|direct}에 들어있다.
-let activeSeries = 'all';
-function CUR(){ return PAYLOAD.series[activeSeries]; }
-
-function aggregate(startI, endI, seriesKey){
-  const S = seriesKey ? PAYLOAD.series[seriesKey] : CUR();
-  let imp=0, clk=0, rev=0, any=false;
-  for (let i=startI;i<=endI;i++){
-    if (S.impressions[i] != null){
-      imp += S.impressions[i]; clk += S.clicks[i]; rev += S.revenue[i]; any = true;
-    }
+  if (eVal){
+    e = -1;
+    for (let i = dates.length - 1; i >= 0; i--){ if (dates[i] <= eVal){ e = i; break; } }
+    if (e === -1) e = 0;
   }
-  return {
-    impressions: any?imp:null, clicks: any?clk:null, revenue: any?rev:null,
-    ctr: imp ? clk/imp : null,
-    cpc: clk ? rev/clk : null,
-    ecpm: imp ? rev/imp*1000 : null,
-  };
+
+  if (s > e){ const t = s; s = e; e = t; }
+  startIdx = s; endIdx = e;
+  activePreset = null;
+  clampIndices();
+  syncInputs();
+  renderAll();
 }
 
-function renderKpis(){
-  const agg = aggregate(startIdx, endIdx);
-  const box = document.getElementById('mwa-kpiGrid');
-  box.innerHTML = '';
-  const isSingleDay = (endIdx - startIdx) === 0;
-  // 하루만 선택하면 '기간 합계'가 그날 값 그대로라 표·차트와 겹친다.
-  // 대신 전일 대비 변화를 보여줘서 이 카드만의 정보를 갖게 한다.
-  const prevAgg = (isSingleDay && startIdx > 0) ? aggregate(startIdx - 1, startIdx - 1) : null;
-
-  METRICS.forEach(m => {
-    const card = document.createElement('div');
-    card.className = 'kpi-card';
-    const isRatio = m.key === 'ctr' || m.key === 'cpc' || m.key === 'ecpm';
-    let deltaHtml = '';
-    if (isSingleDay && prevAgg && prevAgg[m.key] != null && agg[m.key] != null && prevAgg[m.key] !== 0) {
-      const delta = ((agg[m.key] - prevAgg[m.key]) / Math.abs(prevAgg[m.key])) * 100;
-      deltaHtml = `<div class="kpi-delta"><span class="${delta>=0?'arrow-up':'arrow-down'}">${delta>=0?'▲':'▼'} ${Math.abs(delta).toFixed(1)}%</span><span>전일 대비</span></div>`;
-    } else if (isSingleDay) {
-      deltaHtml = `<div class="kpi-delta"><span>전일 데이터 없음</span></div>`;
-    }
-    card.innerHTML = `
-      <div class="kpi-label">${m.label}</div>
-      <div class="kpi-value">${m.fmt(agg[m.key])}</div>
-      <div class="kpi-unit">${isRatio ? '기간 가중평균' : '기간 합계'}</div>
-      ${deltaHtml}
-    `;
-    box.appendChild(card);
-  });
-
-  const n = endIdx - startIdx + 1;
-  document.getElementById('mwa-periodLabel').textContent =
-    `기간: ${PAYLOAD.dates[startIdx]} ~ ${PAYLOAD.dates[endIdx]} (${n}일)`;
-}
-
-function renderCharts(){
-  charts.forEach(c => c.destroy());
-  charts = [];
-  const grid = document.getElementById('mwa-chartGrid');
-  grid.innerHTML = '';
-
-  // 하루만 선택하면 막대 1개짜리 차트 6개가 위 KPI 카드·아래 표와 완전히 같은 숫자를
-  // 반복할 뿐이라 아예 숨긴다 (표에 최신 행 강조 표시가 있어 정보 손실은 없음).
-  if ((endIdx - startIdx) === 0){
-    grid.style.display = 'none';
-    return;
-  }
-  grid.style.display = '';
-
-  const dates = PAYLOAD.dates.slice(startIdx, endIdx + 1);
-  const labels = dates.map(shortDate);
-  const tickEvery = Math.max(1, Math.ceil(labels.length / 6));
-  const color = getVar('--c-metric');
-  // 기간이 아주 짧으면 점 1~3개짜리 선이 되어 추세로 읽히지 않으므로 막대로 표시한다.
-  const useBar = labels.length <= 3;
-
-  METRICS.forEach(m => {
-    const card = document.createElement('div');
-    card.className = 'chart-card';
-    card.innerHTML = `<div class="chart-title">${m.label}</div><div class="chart-box"><canvas></canvas></div>`;
-    grid.appendChild(card);
-
-    const values = CUR()[m.key].slice(startIdx, endIdx + 1);
-    const ctx = card.querySelector('canvas').getContext('2d');
-    const gradient = ctx.createLinearGradient(0,0,0,150);
-    gradient.addColorStop(0, color + '33');
-    gradient.addColorStop(1, color + '00');
-
-    try {
-      const chart = new Chart(ctx, {
-        type: useBar ? 'bar' : 'line',
-        data: {
-          labels,
-          datasets: useBar ? [{
-            data: values, backgroundColor: color, borderRadius: 4, maxBarThickness: 56,
-          }] : [{
-            data: values, borderColor: color, backgroundColor: gradient, fill: true,
-            spanGaps: false, tension: 0.3, borderWidth: 2,
-            pointRadius: labels.length <= 20 ? 2 : 0, pointHoverRadius: 4,
-          }]
-        },
-        options: {
-          responsive: true, maintainAspectRatio: false,
-          interaction: {mode:'index', intersect:false},
-          plugins: {
-            legend: {display:false},
-            tooltip: {
-              backgroundColor:'#1e1e2c', borderColor:'#33334a', borderWidth:1,
-              titleFont:{family:"'JetBrains Mono',monospace", size:10.5},
-              bodyFont:{family:"'JetBrains Mono',monospace", size:10.5}, padding:9,
-              callbacks: {
-                title: (items) => dates[items[0].dataIndex],
-                label: (item) => item.parsed.y === null ? '데이터 없음' : m.fmt(item.parsed.y),
-              }
-            }
-          },
-          scales: {
-            x: {
-              grid:{display:false},
-              ticks:{color:'#54526a', font:{family:"'JetBrains Mono',monospace", size:8.5}, maxRotation:0, autoSkip:false,
-                callback: function(val, i){ return (i % tickEvery === 0 || i === labels.length-1) ? this.getLabelForValue(val) : ''; } },
-              border:{color:'#282836'},
-            },
-            y: {
-              grid:{color:'#20202c'},
-              ticks:{color:'#54526a', font:{family:"'JetBrains Mono',monospace", size:8.5},
-                callback: (v) => m.key==='ctr' ? (v*100).toFixed(1)+'%' : (Math.abs(v)>=10000 ? Math.round(v/1000)+'k' : numFmt0.format(v)) },
-              border:{display:false},
-            }
-          }
-        }
-      });
-      charts.push(chart);
-    } catch (err) {
-      card.querySelector('.chart-box').innerHTML =
-        `<div class="chart-error-box">차트 오류: ${err.message}</div>`;
-      console.error('chart render failed for', m.key, err);
-    }
-  });
-}
-
-let tableSortKey = 'date', tableSortDir = 'asc';
-
-function renderTable(){
-  const dates = PAYLOAD.dates.slice(startIdx, endIdx + 1);
-  const latestDate = dates[dates.length - 1];
-  const cols = [{key:'date', label:'날짜'}, ...METRICS];
-
-  const rows = dates.map((d, i) => {
-    const idx = startIdx + i;
-    const row = {date: d};
-    METRICS.forEach(m => { row[m.key] = CUR()[m.key][idx]; });
-    return row;
-  });
-
-  const sorted = [...rows].sort((a, b) => {
-    const av = a[tableSortKey], bv = b[tableSortKey];
-    if (tableSortKey === 'date') return tableSortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
-    if (av == null && bv == null) return 0;
-    if (av == null) return 1;   // 데이터 없는 날짜는 항상 뒤로
-    if (bv == null) return -1;
-    return tableSortDir === 'asc' ? av - bv : bv - av;
-  });
-
-  const thead = '<thead><tr>' + cols.map(c => {
-    const arrow = tableSortKey === c.key ? (tableSortDir === 'asc' ? ' ▲' : ' ▼') : '';
-    return `<th data-key="${c.key}" class="${tableSortKey===c.key?'sorted':''}">${c.label}${arrow}</th>`;
-  }).join('') + '</tr></thead>';
-
-  const rowsHtml = sorted.map(row => {
-    const isLatest = row.date === latestDate;
-    return '<tr' + (isLatest ? ' class="latest-row"' : '') + '><td>' + row.date + (isLatest ? ' <span class="latest-tag">최신</span>' : '') + '</td>' +
-      METRICS.map(m => {
-        const v = row[m.key];
-        return `<td class="${v==null?'na':''}">${m.fmt(v)}</td>`;
-      }).join('') + '</tr>';
-  }).join('');
-
-  document.getElementById('mwa-dataTable').innerHTML = thead + '<tbody>' + rowsHtml + '</tbody>';
-
-  document.querySelectorAll('#mwa-dataTable th').forEach(th => {
-    th.addEventListener('click', () => {
-      const key = th.dataset.key;
-      if (tableSortKey === key) tableSortDir = tableSortDir === 'asc' ? 'desc' : 'asc';
-      else { tableSortKey = key; tableSortDir = key === 'date' ? 'asc' : 'desc'; }
-      renderTable();
-    });
-  });
-}
-
-function renderSummary3(){
-  // Mobwith 전체 정산금액 하나를 크게 보여주고, SSP/직광고 구성은 막대와 비율로 표현한다.
-  // (금액 3개를 나란히 두면 무엇이 무엇의 합인지, 어느 쪽이 큰지 눈으로 바로 안 들어와서)
-  const ssp = aggregate(startIdx, endIdx, 'ssp').revenue;
-  const dir = aggregate(startIdx, endIdx, 'direct').revenue;
-  const all = aggregate(startIdx, endIdx, 'all').revenue;
-
-  const n = endIdx - startIdx + 1;
-  document.getElementById('splitPeriod').textContent =
-    `· ${PAYLOAD.dates[startIdx]} ~ ${PAYLOAD.dates[endIdx]} (${n}일)`;
-  document.getElementById('splitTotal').textContent = all == null ? '–' : fmtKrwPlain(all);
-
-  const s = ssp || 0, d = dir || 0;
-  // 비율 막대는 음수(정산 차감)를 표현할 수 없으므로 절댓값 기준으로 폭을 잡는다
-  const base = Math.abs(s) + Math.abs(d);
-  const sPct = base ? Math.abs(s) / base * 100 : 0;
-  document.getElementById('barSsp').style.width = sPct + '%';
-  document.getElementById('barDirect').style.width = (base ? 100 - sPct : 0) + '%';
-
-  document.getElementById('legSsp').textContent = ssp == null ? '–' : fmtKrwPlain(ssp);
-  document.getElementById('legDirect').textContent = dir == null ? '–' : fmtKrwPlain(dir);
-  const pct = v => (all && all !== 0) ? `(${(v / all * 100).toFixed(1)}%)` : '';
-  document.getElementById('pctSsp').textContent = ssp == null ? '' : pct(ssp);
-  document.getElementById('pctDirect').textContent = dir == null ? '' : pct(dir);
-
-  // 저번 달 같은 기간과 비교 (예: 9/1~9/7 -> 8/1~8/7). 그 구간에 데이터가 없으면 표시하지 않는다.
-  const delta = document.getElementById('splitDelta');
-  const pr = prevMonthRange(PAYLOAD.dates[startIdx], PAYLOAD.dates[endIdx], PAYLOAD.dates);
-  delta.innerHTML = '';
-  if (pr && all != null){
-    const prev = aggregate(pr[0], pr[1], 'all').revenue;
-    if (prev != null && prev > 0){
-      const ch = ((all / prev) - 1) * 100;
-      delta.innerHTML = `<span class="${ch>=0?'up':'down'}">${ch>=0?'▲':'▼'} ${Math.abs(ch).toFixed(1)}%</span>`
-        + `<br/>저번 달 같은 기간 대비`;
-    }
-  }
-}
-
-function renderAll(){
-  renderSummary3();
-  renderKpis();
-  renderCharts();
-  renderTable();
-}
-
-function renderReconcile(payload){
-  const el = document.getElementById('mwReconcile');
-  const items = payload.reconcile || [];
-  if (!items.length){ el.style.display='none'; return; }
-  el.style.display='';
-  const shown = items.slice(0,3).map(x =>
-    `${x.date} ${x.type}: 시트 ${fmtKrwPlain(x.sheet)} vs 히트맵 ${fmtKrwPlain(x.heatmap)} (차이 ${fmtKrwPlain(x.diff)})`
-  ).join('<br/>');
-  const more = items.length > 3 ? `<br/>… 외 ${items.length - 3}건` : '';
-  el.innerHTML = `<b>일별 시트(A·C)와 지면별 시트(B)의 합계가 어긋나는 날이 ${items.length}건 있습니다.</b> `
-    + `한쪽 수치가 잘못 입력됐을 수 있어요.<br/><span class="reconcile-detail">${shown}${more}</span>`;
-}
-
+/* ---------- 초기화 ---------- */
 function init(payload){
   PAYLOAD = payload;
-  renderReconcile(payload);
-  if (!payload.dates.length){
-    document.getElementById('mwa-kpiGrid').innerHTML =
-      '<div style="color:var(--text-dim);font-size:13px;">표시할 데이터가 없습니다.</div>';
+  const dates = payload.dates;
+
+  if (!dates.length){
+    kpiGrid.innerHTML = '<div style="color:var(--text-dim);font-size:13px;">표시할 데이터가 없습니다.</div>';
     return;
   }
-  const sIn = document.getElementById('mwa-startInput'), eIn = document.getElementById('mwa-endInput');
-  sIn.min = payload.dates[0]; sIn.max = payload.dates[payload.dates.length-1];
-  eIn.min = payload.dates[0]; eIn.max = payload.dates[payload.dates.length-1];
 
+  document.getElementById('dateRange').textContent =
+    dates[0].replace(/-/g,'.') + ' – ' + dates[dates.length-1].replace(/-/g,'.');
+  document.getElementById('generatedAt').textContent = payload.generatedAt;
+  document.getElementById('vendorList').textContent = Object.values(payload.vendors).map(v => v.label).join(' · ');
+
+  const sIn = document.getElementById('startInput');
+  const eIn = document.getElementById('endInput');
+  sIn.min = dates[0]; sIn.max = dates[dates.length-1];
+  eIn.min = dates[0]; eIn.max = dates[dates.length-1];
+
+  // 기본 표시: 오퍼월 합계 + 애드네트워크 합계 두 선만.
+  // 업체 6개를 한꺼번에 그리면 선이 얽혀 읽기 어렵고, 먼저 보고 싶은 건 대개
+  // "두 사업이 각각 어떻게 움직이는가"이기 때문. 개별 업체는 아래에서 켜서 본다.
+  Object.keys(payload.vendors).forEach(k => { seriesVisible[k] = false; });
+  GROUP_ORDER.forEach(g => { seriesVisible[GROUP_KEY_PREFIX + g] = true; });
+  seriesVisible[TOTAL_KEY] = false;
+
+  // 기본값 = 이번 달(데이터상 최신 날짜 기준)
   applyPreset('mtd');
 }
 
+// 데이터만 교체될 때(자동 갱신) — 사용자가 고른 기간을 날짜 기준으로 최대한 유지
 function reinit(payload){
-  const prevPreset = activePreset;
   const prevStart = PAYLOAD ? PAYLOAD.dates[startIdx] : null;
   const prevEnd = PAYLOAD ? PAYLOAD.dates[endIdx] : null;
+  const wasAll = activePreset === 'all';
+  const prevPreset = activePreset;
+
   PAYLOAD = payload;
-  renderReconcile(payload);
-  if (!payload.dates.length) return;
+  const dates = payload.dates;
+  if (!dates.length) return;
 
-  const sIn = document.getElementById('mwa-startInput'), eIn = document.getElementById('mwa-endInput');
-  sIn.min = payload.dates[0]; sIn.max = payload.dates[payload.dates.length-1];
-  eIn.min = payload.dates[0]; eIn.max = payload.dates[payload.dates.length-1];
+  document.getElementById('dateRange').textContent =
+    dates[0].replace(/-/g,'.') + ' – ' + dates[dates.length-1].replace(/-/g,'.');
+  document.getElementById('generatedAt').textContent = payload.generatedAt;
+  document.getElementById('vendorList').textContent = Object.values(payload.vendors).map(v => v.label).join(' · ');
 
-  if (prevPreset !== null){ applyPreset(prevPreset); return; }
-  let s = payload.dates.findIndex(d => d >= prevStart); if (s === -1) s = 0;
-  let e = -1; for (let i=payload.dates.length-1;i>=0;i--){ if (payload.dates[i] <= prevEnd){ e=i; break; } } if (e===-1) e=payload.dates.length-1;
-  startIdx = s; endIdx = e; clampIndices(); syncInputs(); renderAll();
-}
+  const sIn = document.getElementById('startInput');
+  const eIn = document.getElementById('endInput');
+  sIn.min = dates[0]; sIn.max = dates[dates.length-1];
+  eIn.min = dates[0]; eIn.max = dates[dates.length-1];
 
-document.getElementById('mwa-presetSeg').addEventListener('click', (ev) => {
-  const btn = ev.target.closest('button'); if (!btn) return; applyPreset(btn.dataset.preset);
-});
-document.getElementById('mwaSeriesSeg').addEventListener('click', (ev) => {
-  const btn = ev.target.closest('button'); if (!btn) return;
-  activeSeries = btn.dataset.s;
-  document.querySelectorAll('#mwaSeriesSeg button').forEach(b => b.classList.toggle('active', b === btn));
+  if (wasAll || prevPreset !== null){
+    applyPreset(prevPreset || 'all');
+    return;
+  }
+  // 커스텀 기간이면 같은 날짜로 다시 매칭
+  let s = dates.findIndex(d => d >= prevStart);
+  if (s === -1) s = 0;
+  let e = -1;
+  for (let i = dates.length - 1; i >= 0; i--){ if (dates[i] <= prevEnd){ e = i; break; } }
+  if (e === -1) e = dates.length - 1;
+  startIdx = s; endIdx = e;
+  clampIndices();
+  syncInputs();
   renderAll();
-});
-document.getElementById('mwa-startInput').addEventListener('change', onDateInputChange);
-document.getElementById('mwa-endInput').addEventListener('change', onDateInputChange);
-  return { init, reinit };
-})();
-
-
-const MobwithB = (function(){
-
-let DATA = null;
-const f0 = new Intl.NumberFormat('ko-KR',{maximumFractionDigits:0});
-const f2 = new Intl.NumberFormat('ko-KR',{maximumFractionDigits:2});
-const METRICS = [
-  {key:'impressions',label:'노출수',fmt:v=>v==null?'–':f0.format(v)},
-  {key:'clicks',label:'클릭수',fmt:v=>v==null?'–':f0.format(v)},
-  {key:'ctr',label:'CTR',fmt:v=>v==null?'–':f2.format(v*100)+'%'},
-  {key:'cpc',label:'CPC',fmt:v=>fmtKrw(v)},
-  {key:'revenue',label:'정산금액',fmt:v=>fmtKrw(v)},
-  {key:'revenueChange',label:'변화율',fmt:v=>fmtChange(v),isChange:true},
-  {key:'revShare',label:'매출비중',fmt:v=>v==null?'–':f2.format(v*100)+'%'},
-  {key:'ecpm',label:'eCPM',fmt:v=>fmtKrw(v)},
-  {key:'ecpmChange',label:'변화율',fmt:v=>fmtChange(v),isChange:true},
-];
-// 변화율 표기 — 미미한 변동(±3% 미만)은 회색으로 눌러서 시각적 노이즈를 줄인다.
-// null은 비교할 직전 7일이 없는 경우(데이터 14일 미만).
-function fmtChange(v){
-  // 'new' = 직전 7일 매출이 0이었는데 최근 7일에 매출이 생긴 경우.
-  // 증가율이 무한대라 %로 못 쓰므로 '신규'로 표기한다.
-  if (v === 'new') return '<span class="chg chg-up" title="직전 7일 매출이 0원이라 증가율을 계산할 수 없습니다">신규</span>';
-  if (v == null) return '<span class="chg-na" title="직전 7일 매출이 0 이하라 비율 비교가 불가능합니다">–</span>';
-  const cls = Math.abs(v) < 3 ? 'chg-flat' : (v > 0 ? 'chg-up' : 'chg-down');
-  return `<span class="chg ${cls}">${v > 0 ? '+' : ''}${v.toFixed(1)}%</span>`;
-}
-// 팝업 그래프 대상 지표만 (매출비중은 현재 필터 안에서의 상대값이라 일별로 쪼개면
-// 의미가 달라지므로 팝업 그래프 대상에서 제외. 변화율도 파생값이라 제외)
-const CHARTABLE = ['impressions','clicks','ctr','cpc','revenue','ecpm'];
-function getVar(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
-
-let sI=0, eI=0, activePreset='7';
-let sortKey='revenue', sortDir='desc';
-// 히트맵과 분포도는 서로 다른 용도로 쓰이므로 OS 필터를 각각 독립적으로 둔다.
-let osHeat='all', osScatter='all';
-// 광고유형 필터(히트맵·분포도 공유). 'all'이면 모든 유형을 합산한다.
-let adTypeFilter = 'all';
-// 지면 p의 i번째 날짜 값을, 현재 광고유형 필터 기준으로 합산해 돌려준다.
-// 유형별 배열 중 값이 하나라도 있으면 합산하고, 전부 결측이면 null(공백)을 유지한다.
-function cellOf(p, i){
-  const types = adTypeFilter === 'all' ? DATA.adTypes : [adTypeFilter];
-  let imp=0, clk=0, rev=0, any=false;
-  types.forEach(t => {
-    const bt = p.byType[t];
-    if (!bt) return;
-    if (bt.revenue[i] == null) return;
-    imp += bt.impressions[i]; clk += bt.clicks[i]; rev += bt.revenue[i]; any = true;
-  });
-  return any ? {imp, clk, rev} : null;
-}
-// 지면이 어떤 유형에서 매출이 있었는지 (전체 보기에서 배지로 표시)
-function typesWithRevenue(p){
-  return DATA.adTypes.filter(t => {
-    const bt = p.byType[t];
-    return bt && bt.revenue.some(v => v != null && v !== 0);
-  });
-}
-// 지면 선택 필터는 반대로 히트맵·분포도 양쪽에 공유로 적용한다(사용자 요청).
-// null = 전체 지면 표시, Set이면 그 안의 id만 표시.
-let placementFilter = null;
-// 이미 한 번이라도 목록에 나타났던 지면 id — 갱신 때 '새로 생긴 지면'을 구분하는 데 쓴다.
-let knownPlacementIds = new Set();
-let openId=null; // 지면명 클릭 시 펼쳐진 일자별 표의 대상 (한 번에 하나만)
-let scatterChart=null, modalChart=null;
-let modalState=null; // {placementId, metricKey, sI, eI}
-
-function periodDates(rangeS, rangeE){ return DATA.dates.slice(rangeS,rangeE+1); }
-
-// 선택 기간 + 주어진 OS 필터 + 공유 지면 필터 기준 지면별 집계
-// (비율 지표는 합산 후 도출 — 일별 비율의 단순평균이 아님)
-function aggregate(osFilter){
-  let src = osFilter==='all' ? DATA.placements : DATA.placements.filter(p=>p.os===osFilter);
-  if (placementFilter) src = src.filter(p => placementFilter.has(p.id));
-  const rows = src.map(p=>{
-    let imp=0,clk=0,rev=0,any=false;
-    for(let i=sI;i<=eI;i++){
-      const c=cellOf(p,i);
-      if(c){imp+=c.imp;clk+=c.clk;rev+=c.rev;any=true;}
-    }
-    return {id:p.id,name:p.name,os:p.os,
-      impressions:any?imp:null, clicks:any?clk:null, revenue:any?rev:null,
-      ctr:imp?clk/imp:null, cpc:clk?rev/clk:null, ecpm:imp?rev/imp*1000:null};
-  });
-  // 매출비중은 "현재 보이는 지면들" 안에서의 비중 — Android만 필터하면
-  // Android 지면들끼리의 비중으로 다시 계산된다.
-  const tot = rows.reduce((s,r)=>s+(r.revenue||0),0);
-  rows.forEach(r=>{
-    r.revShare = tot?( (r.revenue||0)/tot ):null;
-    // 변화율은 선택 기간과 무관하게 항상 최근 14일 기준(위 computeChangeRates 참고)
-    const p = DATA.placements.find(x => x.id === r.id);
-    const ch = p ? computeChangeRates(p) : {revenueChange:null, ecpmChange:null};
-    r.revenueChange = ch.revenueChange;
-    r.ecpmChange = ch.ecpmChange;
-  });
-  return rows;
 }
 
-function applyPreset(p){
-  activePreset=p;
-  const n=DATA.dates.length;
-  eI=n-1; sI=(p==='all') ? 0 : Math.max(0, n-parseInt(p,10));
-  document.querySelectorAll('#mwb-presetSeg button').forEach(b=>b.classList.toggle('active', b.dataset.p===p));
-  const ds=periodDates(sI,eI);
-  document.getElementById('mwb-periodLabel').textContent = `기간: ${ds[0]} ~ ${ds[ds.length-1]} (${ds.length}일)`;
-  document.getElementById('mwb-startInput').value = DATA.dates[sI];
-  document.getElementById('mwb-endInput').value = DATA.dates[eI];
-  openId=null; // 기간이 바뀌면 펼쳐둔 일자별 표의 내용도 달라지므로 접는다
-  renderScatter(); renderHeat();
-}
+/* ---------- 이벤트 ---------- */
 
-function onDateInputChange(){
-  const dates = DATA.dates;
-  const sVal = document.getElementById('mwb-startInput').value;
-  const eVal = document.getElementById('mwb-endInput').value;
-  let s = 0;
-  if (sVal){ s = dates.findIndex(d => d >= sVal); if (s === -1) s = dates.length - 1; }
-  let e = dates.length - 1;
-  if (eVal){ e = -1; for (let i = dates.length-1;i>=0;i--){ if (dates[i] <= eVal){ e=i; break; } } if (e===-1) e=0; }
-  if (s > e){ const t=s; s=e; e=t; }
-  sI = s; eI = e; activePreset = null;
-  document.querySelectorAll('#mwb-presetSeg button').forEach(b=>b.classList.toggle('active', false));
-  const ds=periodDates(sI,eI);
-  document.getElementById('mwb-periodLabel').textContent = `기간: ${ds[0]} ~ ${ds[ds.length-1]} (${ds.length}일)`;
-  openId=null;
-  renderScatter(); renderHeat();
-}
-
-function applyOsHeat(os){
-  osHeat=os;
-  document.querySelectorAll('#mwb-osSegHeat button').forEach(b=>b.classList.toggle('active', b.dataset.os===os));
-  // 필터를 바꾸면 펼쳐둔 지면이 목록에서 사라질 수 있으므로 접는다
-  if(openId!=null){
-    const still = aggregate(osHeat).some(r=>r.id===openId);
-    if(!still) openId=null;
-  }
-  renderHeat();
-}
-
-function applyOsScatter(os){
-  osScatter=os;
-  document.querySelectorAll('#mwb-osSegScatter button').forEach(b=>b.classList.toggle('active', b.dataset.os===os));
-  renderScatter();
-}
-
-/* ---------- 지면 선택 필터 (히트맵 + 분포도 공유) ---------- */
-function renderPlacementFilterList(){
-  // 갱신 시 새로 생긴 지면은 사용자가 선택/해제한 적이 없으므로 기본적으로 '보이도록'
-  // 필터에 추가한다. 그러지 않으면 새 지면이 조용히 숨겨져 매출을 놓칠 수 있다.
-  if (placementFilter){
-    DATA.placements.forEach(p => {
-      if (!knownPlacementIds.has(p.id)) placementFilter.add(p.id);
-    });
-  }
-  DATA.placements.forEach(p => knownPlacementIds.add(p.id));
-
-  const box = document.getElementById('mwb-placementFilterList');
-  const q = (document.getElementById('mwb-placementSearch').value || '').trim().toLowerCase();
-
-  // 가나다순 정렬 — 매출순으로 두면 갱신될 때마다 순서가 바뀌어 원하는 지면을 찾기 어렵다.
-  // localeCompare('ko')로 한글 자모 순서를 제대로 맞춘다.
-  const sorted = [...DATA.placements].sort((a, b) => a.name.localeCompare(b.name, 'ko'));
-  const shown = q ? sorted.filter(p => p.name.toLowerCase().includes(q)) : sorted;
-
-  box.innerHTML = shown.map(p => {
-    const checked = !placementFilter || placementFilter.has(p.id);
-    const shortName = p.name.replace(/^티머니고_/, '');
-    return `<label class="placement-filter-item">
-      <input type="checkbox" data-id="${p.id}" ${checked?'checked':''}>
-      <span title="${p.name}">${shortName} (${p.os})</span>
-    </label>`;
-  }).join('');
-  document.getElementById('mwb-placementNoMatch').style.display = shown.length ? 'none' : '';
-  updatePlacementFilterCount();
-}
-
-function updatePlacementFilterCount(){
-  const btn = document.getElementById('mwb-placementFilterBtn');
-  const countEl = document.getElementById('mwb-placementFilterCount');
-  if (!placementFilter || placementFilter.size === DATA.placements.length){
-    countEl.textContent = '(전체)';
-    btn.classList.remove('has-filter');
-  } else {
-    countEl.textContent = `(${placementFilter.size}/${DATA.placements.length})`;
-    btn.classList.add('has-filter');
-  }
-}
-
-// 검색으로 목록이 걸러져 있으면 '화면에 보이는 체크박스'만 훑어서는 안 된다 —
-// 검색어에 안 걸린 지면이 조용히 필터에서 빠져버린다. 그래서 전체 선택 집합을
-// 별도로 유지하고, 바뀐 항목만 그 집합에 반영한다.
-function currentSelection(){
-  if (placementFilter) return new Set(placementFilter);
-  return new Set(DATA.placements.map(p => p.id));   // null = 전체 선택 상태
-}
-function commitSelection(sel){
-  placementFilter = (sel.size === DATA.placements.length) ? null : sel;
-  updatePlacementFilterCount();
-  if(openId!=null && placementFilter && !placementFilter.has(openId)) openId=null;
-  renderScatter(); renderHeat();
-}
-function applyPlacementFilterChange(ev){
-  const cb = ev && ev.target && ev.target.matches('input[type="checkbox"]') ? ev.target : null;
-  if (!cb) return;
-  const id = Number(cb.dataset.id);
-  const sel = currentSelection();
-  if (cb.checked) sel.add(id); else sel.delete(id);
-  commitSelection(sel);
-}
-// '전체 선택/해제'는 지금 화면에 보이는(=검색에 걸린) 항목에만 적용한다.
-function setShownPlacements(checked){
-  const ids = [...document.querySelectorAll('#mwb-placementFilterList input[type="checkbox"]')]
-    .map(b => Number(b.dataset.id));
-  const sel = currentSelection();
-  ids.forEach(id => { if (checked) sel.add(id); else sel.delete(id); });
-  commitSelection(sel);
-  renderPlacementFilterList();
-}
-
-document.getElementById('mwb-placementFilterBtn').addEventListener('click', (e)=>{
-  e.stopPropagation();
-  document.getElementById('mwb-placementFilterDropdown').classList.toggle('open');
-});
-document.getElementById('mwb-placementFilterList').addEventListener('change', applyPlacementFilterChange);
-document.getElementById('mwb-placementSelectAll').addEventListener('click', ()=> setShownPlacements(true));
-document.getElementById('mwb-placementSelectNone').addEventListener('click', ()=> setShownPlacements(false));
-document.getElementById('mwb-placementSearch').addEventListener('input', renderPlacementFilterList);
-// 드롭다운 안 클릭이 바깥 클릭으로 잡혀 닫히지 않도록
-document.getElementById('mwb-placementSearch').addEventListener('click', e=> e.stopPropagation());
-document.addEventListener('click', (e)=>{
-  const dd = document.getElementById('mwb-placementFilterDropdown');
-  const btn = document.getElementById('mwb-placementFilterBtn');
-  if (dd.classList.contains('open') && !dd.contains(e.target) && e.target!==btn) dd.classList.remove('open');
+document.getElementById('presetSeg').addEventListener('click', (ev) => {
+  const btn = ev.target.closest('button');
+  if (!btn) return;
+  applyPreset(btn.dataset.preset);
 });
 
-function ensureScatterCanvas(){
-  const el = document.getElementById('mwb-scatterCanvas');
-  if (el && el.tagName !== 'CANVAS'){
-    el.outerHTML = '<canvas id="mwb-scatterCanvas"></canvas>';
-  }
-}
+document.getElementById('scaleSeg').addEventListener('click', (ev) => {
+  const btn = ev.target.closest('button');
+  if (!btn) return;
+  scaleMode = btn.dataset.scale;
+  document.querySelectorAll('#scaleSeg button').forEach(b => {
+    b.classList.toggle('active', b.dataset.scale === scaleMode);
+  });
+  renderTrend();
+});
 
-function renderScatter(){
-  // 데이터 없음/오류로 이전에 캔버스 자리가 <div>로 바뀌어 있을 수 있으므로,
-  // 그릴 데이터가 있을 가능성에 대비해 항상 먼저 진짜 <canvas>로 되돌려놓는다.
-  ensureScatterCanvas();
-  const all=aggregate(osScatter);
-  // 로그 축은 0 이하를 표현할 수 없어 Chart.js가 해당 점을 조용히 빼버린다.
-  // 사용자가 모르게 지면이 사라지지 않도록 직접 걸러내고 몇 개가 빠졌는지 표시한다.
-  const rows=all.filter(r=>r.impressions!=null && r.impressions>0 && r.ecpm!=null);
-  const excluded=all.length-rows.length;
-  const note=document.getElementById('mwb-scatterNote');
-  if(note){
-    note.textContent = excluded
-      ? `이 기간에 노출이 없는 ${excluded}개 지면은 분포도에서 제외됐습니다 (히트맵에는 그대로 표시됩니다).`
-      : '';
-  }
-  if(!rows.length){
-    const box=document.querySelector('#mwb-scatterCanvas');
-    if(box) box.outerHTML='<div id="mwb-scatterCanvas" style="text-align:center;padding:40px;color:var(--text-dim);font-size:13px;">이 기간·필터에 표시할 지면이 없습니다.</div>';
+document.getElementById('startInput').addEventListener('change', onDateInputChange);
+document.getElementById('endInput').addEventListener('change', onDateInputChange);
+
+document.getElementById('seriesToggles').addEventListener('click', (ev) => {
+  // 그룹 헤더의 '모두 켜기/끄기'
+  const allBtn = ev.target.closest('.cg-all');
+  if (allBtn){
+    const g = allBtn.dataset.group;
+    const keys = Object.keys(PAYLOAD.vendors)
+      .filter(k => PAYLOAD.vendors[k].currency === 'KRW' && PAYLOAD.vendors[k].group === g);
+    const allOn = keys.every(k => seriesVisible[k] !== false);
+    keys.forEach(k => { seriesVisible[k] = !allOn; });
+    renderTrend();
     return;
   }
-  const totRev=rows.reduce((s,r)=>s+(r.revenue||0),0);
-  const impVals=rows.map(r=>r.impressions).sort((a,b)=>a-b);
-  const ecpmVals=rows.map(r=>r.ecpm).sort((a,b)=>a-b);
-  const medImp=impVals[Math.floor(impVals.length/2)]||0;
-  const medEcpm=ecpmVals[Math.floor(ecpmVals.length/2)]||0;
+  const btn = ev.target.closest('.series-chip');
+  if (!btn) return;
+  const key = btn.dataset.key;
+  // 합계선은 기본 꺼짐이라 판정 기준이 반대다
+  const isAgg = key === TOTAL_KEY || key.startsWith(GROUP_KEY_PREFIX);
+  seriesVisible[key] = isAgg ? !(seriesVisible[key] === true) : !(seriesVisible[key] !== false);
+  renderTrend();
+});
 
-  const points=rows.map(r=>({x:r.impressions,y:r.ecpm,
-    r:Math.max(4,Math.sqrt(Math.max(0,(r.revenue/totRev)||0)*100)*4), _p:r, _share:(r.revenue/totRev)||0}));
-  const colors=points.map(pt=>{
-    const hiVol=pt.x>=medImp, hiEff=pt.y>=medEcpm;
-    if(hiVol&&hiEff)return '#5ee6a4'; if(hiVol&&!hiEff)return '#f6b860';
-    if(!hiVol&&hiEff)return '#60a5fa'; return '#6b6980';
-  });
 
-  if(scatterChart){scatterChart.destroy();scatterChart=null;}
-  const canvasEl=document.getElementById('mwb-scatterCanvas');
-  if(!canvasEl) return;
-  try{
-    const ctx=canvasEl.getContext('2d');
-    scatterChart=new Chart(ctx,{type:'bubble',
-      data:{datasets:[{data:points,backgroundColor:colors.map(c=>c+'cc'),borderColor:colors,borderWidth:1}]},
-      options:{responsive:true,maintainAspectRatio:false,
-        plugins:{legend:{display:false},
-          tooltip:{backgroundColor:'#1e1e2c',borderColor:'#33334a',borderWidth:1,padding:10,
-            titleFont:{family:"'Malgun Gothic',sans-serif",size:11.5},bodyFont:{family:"'JetBrains Mono',monospace",size:11},
-            callbacks:{title:it=>it[0].raw._p.name,
-              label:it=>{const p=it.raw._p;return['노출수: '+f0.format(p.impressions),'eCPM: \u20a9'+f0.format(p.ecpm),
-                '매출: \u20a9'+f0.format(p.revenue)+' ('+f2.format(it.raw._share*100)+'%)'];}}}},
-        scales:{x:{type:'logarithmic',title:{display:true,text:'노출수 (로그 축)',color:'#54526a',font:{size:10.5}},
-            grid:{color:'#20202c'},ticks:{color:'#54526a',font:{family:"'JetBrains Mono',monospace",size:9},
-              callback:v=>Math.abs(v)>=1000?Math.round(v/1000)+'k':v},border:{color:'#282836'}},
-          y:{title:{display:true,text:'eCPM (원)',color:'#54526a',font:{size:10.5}},grid:{color:'#20202c'},
-            ticks:{color:'#54526a',font:{family:"'JetBrains Mono',monospace",size:9}},border:{display:false}}}}
-    });
-  }catch(err){
-    canvasEl.outerHTML='<div id="mwb-scatterCanvas" style="text-align:center;padding:24px;color:var(--down);font-size:13px;">차트 오류: '+err.message+'</div>';
-    scatterChart=null;
-    console.error('scatter failed:',err);
-  }
-}
-
-// 정산금액·eCPM의 "최근 7일 vs 직전 7일" 변화율(%)을 지면별로 계산.
-// 7일씩 묶어서 비교하므로 하루짜리 노이즈에 흔들리지 않는다.
-// eCPM은 비율 지표라 각 7일 블록의 합계로 다시 계산해서 비교한다
-// (일별 eCPM 7개를 단순평균하면 노출량이 적은 날이 과대 반영되어 틀린 값이 나온다).
-// 데이터가 14일 미만이라 직전 7일을 확보할 수 없으면 null을 반환해 '–'로 표시된다.
-const CHANGE_WINDOW = 7;
-function computeChangeRates(placement){
-  const need = CHANGE_WINDOW * 2;
-  // 선택한 기간과 무관하게, 항상 데이터 전체의 마지막 14일을 기준으로 계산한다
-  // (기간 버튼을 바꿔도 변화율이 뒤집히지 않도록).
-  const n = DATA.dates.length;
-  if (n < need) return {revenueChange: null, ecpmChange: null};
-
-  function blockSums(fromIdx, toIdx){
-    let imp = 0, rev = 0, any = false;
-    for (let i = fromIdx; i <= toIdx; i++){
-      const c = cellOf(placement, i);
-      if (!c) continue;
-      imp += c.imp;
-      rev += c.rev;
-      any = true;
-    }
-    return any ? {imp, rev} : null;
-  }
-  const recent = blockSums(n - CHANGE_WINDOW, n - 1);
-  const prev = blockSums(n - need, n - CHANGE_WINDOW - 1);
-  if (!recent || !prev) return {revenueChange: null, ecpmChange: null};
-
-  // 비교 기준(직전 7일)이 0 이하면 비율 계산이 성립하지 않는다.
-  //  - 기준이 0인데 최근에 매출이 생김 → 증가율이 무한대. '신규'로 표기.
-  //  - 기준이 음수(정산 차감만 있던 기간) → 나눗셈에서 부호가 뒤집히고 값이
-  //    폭발한다(실제로 -331,337% 같은 값이 나왔던 원인). 비교 불가로 처리.
-  function ratioChange(recentVal, prevVal){
-    if (recentVal == null || prevVal == null) return null;
-    if (prevVal > 0) return ((recentVal / prevVal) - 1) * 100;
-    if (prevVal === 0) return recentVal > 0 ? 'new' : null;
-    return null; // prevVal < 0
-  }
-
-  const revChange = ratioChange(recent.rev, prev.rev);
-  const recentEcpm = recent.imp ? recent.rev / recent.imp * 1000 : null;
-  const prevEcpm = prev.imp ? prev.rev / prev.imp * 1000 : null;
-  const ecpmChange = ratioChange(recentEcpm, prevEcpm);
-  return {revenueChange: revChange, ecpmChange: ecpmChange};
-}
-
-function renderHeat(){
-  const rows=aggregate(osHeat);
-  const pctByKey={};
-  METRICS.filter(m=>m.key!=='name').forEach(m=>{
-    const vals=rows.map(r=>r[m.key]).filter(v=>v!=null).sort((a,b)=>a-b);
-    const map=new Map();
-    rows.forEach(r=>{
-      const v=r[m.key];
-      if(v==null){map.set(r.id,null);return;}
-      map.set(r.id, vals.length>1 ? (vals.indexOf(v)/(vals.length-1))*100 : 100);
-    });
-    pctByKey[m.key]=map;
-  });
-
-  const sortMeta = METRICS.find(m => m.key === sortKey);
-  const sortIsChange = !!(sortMeta && sortMeta.isChange);
-  const sorted=[...rows].sort((a,b)=>{
-    const av=a[sortKey], bv=b[sortKey];
-    // 변화율 열은 '가장 크게 움직인 순'이 목적이라 부호를 무시하고 절댓값으로 정렬한다.
-    // 비교할 직전 7일이 없어 null인 지면은 정렬 방향과 무관하게 항상 맨 아래로 보낸다.
-    if (sortIsChange){
-      // 숫자가 아닌 값(null='비교 불가', 'new'='신규')은 정렬 방향과 무관하게
-      // 항상 맨 아래로. 'new'는 신규라는 정보는 있으므로 비교 불가보다는 위에 둔다.
-      const rank = x => (typeof x === 'number' ? 0 : (x === 'new' ? 1 : 2));
-      const ra = rank(av), rb = rank(bv);
-      if (ra !== rb) return ra - rb;
-      if (ra !== 0) return 0;
-      return sortDir==='desc' ? Math.abs(bv)-Math.abs(av) : Math.abs(av)-Math.abs(bv);
-    }
-    return sortDir==='desc'?(bv||0)-(av||0):(av||0)-(bv||0);
-  });
-
-  if(!sorted.length){
-    document.getElementById('mwb-heatTable').innerHTML =
-      '<tbody><tr><td style="padding:16px;color:var(--text-dim);">이 필터에 해당하는 지면이 없습니다.</td></tr></tbody>';
-    return;
-  }
-
-  let h='<thead><tr><th>지면명</th>'+METRICS.map(m=>{
-    const arrow=sortKey===m.key?(sortDir==='desc'?' ▼':' ▲'):'';
-    return `<th data-k="${m.key}" class="${sortKey===m.key?'sorted':''}">${m.label}${arrow}</th>`;
-  }).join('')+'</tr></thead><tbody>';
-
-  sorted.forEach(r=>{
-    const isOpen = openId===r.id;
-    const pl = DATA.placements.find(x=>x.id===r.id);
-    // 전체 보기일 때만 유형 배지 (특정 유형만 볼 땐 이미 그 유형이라 중복 정보)
-    let badges = '';
-    if (pl && adTypeFilter === 'all'){
-      typesWithRevenue(pl).forEach(t => {
-        const cls = t === '직광고' ? 'at-direct' : 'at-ssp';
-        badges += `<span class="at-badge ${cls}">${t}</span>`;
-      });
-    }
-    if (pl && pl.stopped) badges += `<span class="stop-badge" title="${pl.lastDate} 이후 데이터가 없습니다">중지</span>`;
-    h+=`<tr><td class="name-cell${isOpen?' open':''}" data-id="${r.id}"><span class="arrow">▶</span>${r.name}<span style="color:var(--text-faint);font-size:10px">(${r.os})</span>${badges}</td>`;
-    METRICS.filter(m=>m.key!=='name').forEach(m=>{
-      const v=r[m.key];
-      // 변화율 열은 히트맵 색을 입히지 않는다 — 색은 '지면 간 절대값 순위'를 뜻하는데
-      // 변화율은 성격이 달라서 같은 색 규칙을 쓰면 오해를 부른다. 색 대신 자체 색상(초록/빨강)만 사용.
-      if (m.isChange){ h+=`<td class="chg-cell">${m.fmt(v)}</td>`; return; }
-      const pct=pctByKey[m.key].get(r.id);
-      const clickable = CHARTABLE.includes(m.key) && v!=null;
-      const cls = clickable ? ' class="clickable"' : '';
-      const attrs = clickable ? ` data-id="${r.id}" data-metric="${m.key}"` : '';
-      if(pct==null){h+=`<td${cls}${attrs}>${m.fmt(v)}</td>`;return;}
-      const t=pct/100, cr=Math.round(27+69*t), cg=Math.round(27+138*t), cb=Math.round(40+210*t);
-      const fg=pct>=55?'#0b1420':'#c7c5d6';
-      h+=`<td${cls}${attrs} style="background:rgb(${cr},${cg},${cb});color:${fg}">${m.fmt(v)}</td>`;
-    });
-    h+='</tr>';
-    if(isOpen) h+=renderDrillRow(r.id);
-  });
-  h+='</tbody>';
-  document.getElementById('mwb-heatTable').innerHTML=h;
-
-  document.querySelectorAll('#mwb-heatTable th[data-k]').forEach(th=>{
-    th.addEventListener('click',()=>{
-      const k=th.dataset.k;
-      if(sortKey===k)sortDir=sortDir==='desc'?'asc':'desc'; else{sortKey=k;sortDir='desc';}
-      renderHeat();
-    });
-  });
-  document.querySelectorAll('#mwb-heatTable td.clickable').forEach(td=>{
-    td.addEventListener('click',()=>{
-      openModal(Number(td.dataset.id), td.dataset.metric);
-    });
-  });
-  document.querySelectorAll('#mwb-heatTable td.name-cell').forEach(td=>{
-    td.addEventListener('click',()=>{
-      const id=Number(td.dataset.id);
-      openId = openId===id ? null : id;  // 같은 지면 다시 누르면 접기
-      renderHeat();
-    });
+/* ---------- 데이터 로드 (data.json은 GitHub Actions가 주기적으로 갱신) ---------- */
+// GitHub Pages는 CDN(Fastly)을 거치기 때문에, 매번 쿼리스트링을 다르게 붙여서
+// 캐시된 옛 데이터가 아니라 항상 최신 data.json을 받아오도록 함
+function loadData(){
+  const url = './data.json?t=' + Date.now();
+  return fetch(url, {cache: 'no-store'}).then(res => {
+    if (!res.ok) throw new Error('data.json 요청 실패: HTTP ' + res.status);
+    return res.json();
   });
 }
 
-// 지면명 클릭 시 그 아래로 펼쳐지는 일자별 표 (현재 선택된 기간 기준)
-function renderDrillRow(id){
-  const p=DATA.placements.find(x=>x.id===id);
-  if(!p) return '';
-  const ds=periodDates(sI,eI);
-  let rowsHtml='';
-  for(let i=sI;i<=eI;i++){
-    const c=cellOf(p,i);
-    const imp=c?c.imp:null, clk=c?c.clk:null, rev=c?c.rev:null;
-    const ctr=imp?clk/imp:null, cpc=clk?rev/clk:null, ecpm=imp?rev/imp*1000:null;
-    rowsHtml+=`<tr><td>${DATA.dates[i]}</td>
-      <td>${imp==null?'<span class="na">–</span>':f0.format(imp)}</td>
-      <td>${clk==null?'<span class="na">–</span>':f0.format(clk)}</td>
-      <td>${ctr==null?'<span class="na">–</span>':f2.format(ctr*100)+'%'}</td>
-      <td>${cpc==null?'<span class="na">–</span>':fmtKrwPlain(cpc)}</td>
-      <td>${rev==null?'<span class="na">–</span>':fmtKrwPlain(rev)}</td>
-      <td>${ecpm==null?'<span class="na">–</span>':fmtKrwPlain(ecpm)}</td></tr>`;
-  }
-  // colspan은 지면명 1칸 + 지표 칸 수와 정확히 맞춰야 표가 어긋나지 않는다
-  const colCount = 1 + METRICS.filter(m=>m.key!=='name').length;
-  return `<tr class="drill-row"><td colspan="${colCount}"><div class="drill-box">
-    <div class="drill-title">${p.name} · 일자별 수치 (${ds[0]} ~ ${ds[ds.length-1]})</div>
-    <table class="daily"><thead><tr><th>날짜</th><th>노출수</th><th>클릭수</th><th>CTR</th><th>CPC</th><th>정산금액</th><th>eCPM</th></tr></thead>
-    <tbody>${rowsHtml}</tbody></table>
-  </div></td></tr>`;
-}
+loadData()
+  .then(payload => init(payload))
+  .catch(err => {
+    kpiGrid.innerHTML = '<div style="color:var(--down);font-size:13px;">데이터를 불러오지 못했습니다 (' +
+      err.message + '). data.json이 저장소 루트에 있는지, GitHub Actions가 정상 실행됐는지 확인해 주세요.</div>';
+    console.error('initial data load failed:', err);
+  });
 
-/* ---------- 팝업: 지표 하나 클릭 시에만 해당 데이터로 그래프를 만든다 (지연 렌더링) ---------- */
-// 팝업 기본 기간 = 항상 최근 14일. 변화율이 '이번주 7일 vs 전주 7일'(=최근 14일) 비교라서,
-// 팝업을 열었을 때 그 비교의 근거가 된 기간을 그대로 보여주는 편이 자연스럽다.
-// 메인 화면에서 현재 어떤 기간 버튼을 눌러뒀는지와는 무관하게 항상 이 기본값을 쓴다.
-const MODAL_DEFAULT_PRESET = '14';
-function defaultModalRange(){
-  const n = DATA.dates.length;
-  const e = n - 1;
-  const s = Math.max(0, n - parseInt(MODAL_DEFAULT_PRESET, 10));
-  return [s, e];
-}
-
-function openModal(placementId, metricKey){
-  const p = DATA.placements.find(x=>x.id===placementId);
-  if(!p) return;
-  const [defS, defE] = defaultModalRange();
-  modalState = {placementId, metricKey, sI: defS, eI: defE};
-  const m = METRICS.find(x=>x.key===metricKey);
-  document.getElementById('mwb-modalTitle').textContent = `${p.name} · ${m.label}`;
-  document.getElementById('mwb-modalSub').textContent = `(${p.os})`;
-  document.querySelectorAll('#mwb-modalPresetSeg button').forEach(b=>
-    b.classList.toggle('active', b.dataset.p===MODAL_DEFAULT_PRESET));
-  syncModalInputs();
-  document.getElementById('mwb-modalBackdrop').classList.add('open');
-  renderModalChart();
-}
-
-function syncModalInputs(){
-  document.getElementById('mwb-modalStartInput').value = DATA.dates[modalState.sI];
-  document.getElementById('mwb-modalEndInput').value = DATA.dates[modalState.eI];
-}
-
-function onModalDateInputChange(){
-  if(!modalState) return;
-  const dates = DATA.dates;
-  const sVal = document.getElementById('mwb-modalStartInput').value;
-  const eVal = document.getElementById('mwb-modalEndInput').value;
-  let s = 0;
-  if (sVal){ s = dates.findIndex(d => d >= sVal); if (s === -1) s = dates.length - 1; }
-  let e = dates.length - 1;
-  if (eVal){ e = -1; for (let i = dates.length-1;i>=0;i--){ if (dates[i] <= eVal){ e=i; break; } } if (e===-1) e=0; }
-  if (s > e){ const t=s; s=e; e=t; }
-  modalState.sI = s; modalState.eI = e;
-  document.querySelectorAll('#mwb-modalPresetSeg button').forEach(b=>b.classList.toggle('active', false));
-  renderModalChart();
-}
-
-function closeModal(){
-  document.getElementById('mwb-modalBackdrop').classList.remove('open');
-  if(modalChart){ modalChart.destroy(); modalChart=null; }
-  modalState=null;
-}
-
-function modalSeries(){
-  const p = DATA.placements.find(x=>x.id===modalState.placementId);
-  const {sI:ms, eI:me} = modalState;
-  const dates = periodDates(ms,me);
-  // 팝업 그래프도 현재 광고유형 필터를 그대로 따른다(히트맵에서 본 숫자와 일치하도록)
-  const imp=[], clk=[], rev=[];
-  for(let i=ms;i<=me;i++){
-    const c = cellOf(p, i);
-    imp.push(c?c.imp:null); clk.push(c?c.clk:null); rev.push(c?c.rev:null);
-  }
-  let values;
-  if(modalState.metricKey==='impressions') values = imp;
-  else if(modalState.metricKey==='clicks') values = clk;
-  else if(modalState.metricKey==='revenue') values = rev;
-  else if(modalState.metricKey==='ctr') values = imp.map((v,i)=> v?clk[i]/v:null);
-  else if(modalState.metricKey==='cpc') values = clk.map((v,i)=> v?rev[i]/v:null);
-  else values = imp.map((v,i)=> v?rev[i]/v*1000:null); // ecpm
-  return {dates, values};
-}
-
-function renderModalChart(){
-  const {dates, values} = modalSeries();
-  const m = METRICS.find(x=>x.key===modalState.metricKey);
-  const color = getVar('--c-metric');
-
-  if(modalChart){ modalChart.destroy(); modalChart=null; }
-  const box = document.getElementById('mwb-modalChartBox');
-  if(!document.getElementById('mwb-modalCanvas')){
-    box.innerHTML = '<canvas id="mwb-modalCanvas"></canvas>';
-  }
-  try{
-    const ctx = document.getElementById('mwb-modalCanvas').getContext('2d');
-    const gradient = ctx.createLinearGradient(0,0,0,260);
-    gradient.addColorStop(0, color+'33'); gradient.addColorStop(1, color+'00');
-    const useBar = values.length<=3;
-    modalChart = new Chart(ctx,{type: useBar?'bar':'line',
-      data:{labels:dates.map(d=>d.slice(5).replace('-','/')),
-        datasets:[{data:values, borderColor:color, backgroundColor: useBar?color:gradient,
-          fill: !useBar, spanGaps:false, tension:.3, borderWidth:2,
-          pointRadius: values.length<=20?3:0, pointHoverRadius:5, borderRadius:4, maxBarThickness:56}]},
-      options:{responsive:true, maintainAspectRatio:false,
-        interaction:{mode:'index', intersect:false},
-        plugins:{legend:{display:false},
-          tooltip:{backgroundColor:'#1e1e2c',borderColor:'#33334a',borderWidth:1,padding:9,
-            titleFont:{family:"'JetBrains Mono',monospace",size:10.5},bodyFont:{family:"'JetBrains Mono',monospace",size:10.5},
-            callbacks:{label:it=> it.parsed.y==null?'데이터 없음': m.fmt(it.parsed.y)}}},
-        scales:{x:{grid:{display:false},border:{color:'#282836'},
-            ticks:{color:'#54526a',font:{family:"'JetBrains Mono',monospace",size:9},maxRotation:0}},
-          y:{grid:{color:'#20202c'},border:{display:false},
-            ticks:{color:'#54526a',font:{family:"'JetBrains Mono',monospace",size:9},
-              callback:v=> modalState.metricKey==='ctr' ? (v*100).toFixed(1)+'%' : (Math.abs(v)>=10000?Math.round(v/10000)+'만':f0.format(v))}}}}
-    });
-  }catch(err){
-    box.innerHTML = `<div style="text-align:center;padding:24px;color:var(--down);font-size:13px;">차트 오류: ${err.message}</div>`;
-    modalChart=null;
-    console.error('modal chart failed:',err);
-  }
-}
-
-document.getElementById('mwb-presetSeg').addEventListener('click',e=>{
-  const b=e.target.closest('button'); if(!b)return; applyPreset(b.dataset.p);
-});
-// 광고유형 버튼은 시트에 실제로 등장한 값으로 만든다(유형이 늘어나면 자동 반영).
-function renderAdTypeSeg(){
-  const seg = document.getElementById('mwbAdTypeSeg');
-  const types = DATA.adTypes || [];
-  if (types.length < 2){ seg.style.display='none'; return; }  // 유형이 하나뿐이면 토글이 무의미
-  seg.style.display='';
-  seg.innerHTML = `<button data-at="all" class="${adTypeFilter==='all'?'active':''}">전체</button>` +
-    types.map(t=>`<button data-at="${t}" class="${adTypeFilter===t?'active':''}">${t}</button>`).join('');
-}
-
-document.getElementById('mwbAdTypeSeg').addEventListener('click',e=>{
-  const b=e.target.closest('button'); if(!b)return;
-  adTypeFilter=b.dataset.at;
-  document.querySelectorAll('#mwbAdTypeSeg button').forEach(x=>x.classList.toggle('active',x===b));
-  openId=null;  // 유형이 바뀌면 펼쳐둔 일자별 표의 내용도 달라지므로 접는다
-  if (modalState) closeModal();
-  renderScatter(); renderHeat();
-});
-
-document.getElementById('mwb-osSegHeat').addEventListener('click',e=>{
-  const b=e.target.closest('button'); if(!b)return; applyOsHeat(b.dataset.os);
-});
-document.getElementById('mwb-osSegScatter').addEventListener('click',e=>{
-  const b=e.target.closest('button'); if(!b)return; applyOsScatter(b.dataset.os);
-});
-document.getElementById('mwb-startInput').addEventListener('change', onDateInputChange);
-document.getElementById('mwb-endInput').addEventListener('change', onDateInputChange);
-document.getElementById('mwb-modalPresetSeg').addEventListener('click',e=>{
-  const b=e.target.closest('button'); if(!b||!modalState)return;
-  document.querySelectorAll('#mwb-modalPresetSeg button').forEach(x=>x.classList.toggle('active',x===b));
-  const n=DATA.dates.length, p=b.dataset.p;
-  modalState.eI=n-1; modalState.sI=(p==='all') ? 0 : Math.max(0, n-parseInt(p,10));
-  syncModalInputs();
-  renderModalChart();
-});
-document.getElementById('mwb-modalStartInput').addEventListener('change', onModalDateInputChange);
-document.getElementById('mwb-modalEndInput').addEventListener('change', onModalDateInputChange);
-document.getElementById('mwb-modalClose').addEventListener('click', closeModal);
-document.getElementById('mwb-modalBackdrop').addEventListener('click', e=>{
-  if(e.target.id==='modalBackdrop') closeModal();
-});
-document.addEventListener('keydown', e=>{ if(e.key==='Escape' && modalState) closeModal(); });
-
-function initPage(payload){
-  DATA = payload;
-  if (!payload.dates || !payload.dates.length){
-    document.getElementById('mwb-heatTable').innerHTML =
-      '<tbody><tr><td style="padding:16px;color:var(--text-dim);">표시할 데이터가 없습니다.</td></tr></tbody>';
-    const sc = document.getElementById('mwb-scatterCanvas');
-    if (sc) sc.outerHTML = '<div id="mwb-scatterCanvas" style="text-align:center;padding:40px;color:var(--text-dim);font-size:13px;">표시할 데이터가 없습니다.</div>';
-    return;
-  }
-  const sIn = document.getElementById('mwb-startInput'), eIn = document.getElementById('mwb-endInput');
-  sIn.min = payload.dates[0]; sIn.max = payload.dates[payload.dates.length-1];
-  eIn.min = payload.dates[0]; eIn.max = payload.dates[payload.dates.length-1];
-  const msIn = document.getElementById('mwb-modalStartInput'), meIn = document.getElementById('mwb-modalEndInput');
-  msIn.min = payload.dates[0]; msIn.max = payload.dates[payload.dates.length-1];
-  meIn.min = payload.dates[0]; meIn.max = payload.dates[payload.dates.length-1];
-  renderAdTypeSeg();
-  renderPlacementFilterList();
-  openId=null;
-  if (modalState) closeModal();
-  applyPreset(activePreset || 'mtd');
-}
-  return { init: initPage, reinit: initPage };
-})();
-
-
-/* ---------- 공유 헤더(기간 무관 공통 표시)와 새로고침을 담당하는 페이지 레벨 로더 ---------- */
-function loadBoth(){
-  return Promise.all([
-    fetch('./mobwith-a.json?t=' + Date.now(), {cache:'no-store'}).then(r => { if(!r.ok) throw new Error('mobwith-a.json 요청 실패: HTTP '+r.status); return r.json(); }),
-    fetch('./mobwith-b.json?t=' + Date.now(), {cache:'no-store'}).then(r => { if(!r.ok) throw new Error('mobwith-b.json 요청 실패: HTTP '+r.status); return r.json(); }),
-  ]);
-}
-
-function applyShared(payloadA){
-  if (payloadA && payloadA.dates && payloadA.dates.length){
-    document.getElementById('dateRange').textContent =
-      payloadA.dates[0].replace(/-/g,'.') + ' – ' + payloadA.dates[payloadA.dates.length-1].replace(/-/g,'.');
-  }
-  document.getElementById('generatedAt').textContent = (payloadA && payloadA.generatedAt) || '–';
-}
-
-loadBoth().then(([a, b]) => {
-  applyShared(a);
-  MobwithA.init(a);
-  MobwithB.init(b);
-}).catch(err => {
-  document.getElementById('generatedAt').textContent = '로드 실패';
-  console.error('initial load failed:', err);
-});
-
+/* ---------- 주기 자동 갱신 (전체 새로고침 없이 data.json만 다시 받아옴) ---------- */
 const REFRESH_MINUTES = 15;
-let refreshingBoth = false;
-function refreshBoth(){
-  if (refreshingBoth) return;
-  refreshingBoth = true;
+let refreshing = false;
+function refreshData(){
+  if (refreshing) return;
+  refreshing = true;
   const indicator = document.getElementById('refreshIndicator');
   indicator.textContent = '갱신 중…';
-  loadBoth().then(([a, b]) => {
-    applyShared(a);
-    MobwithA.reinit(a);
-    MobwithB.reinit(b);
-    indicator.textContent = '';
-    refreshingBoth = false;
-  }).catch(() => {
-    indicator.textContent = '갱신 실패';
-    refreshingBoth = false;
-  });
+  loadData()
+    .then(payload => {
+      reinit(payload);
+      indicator.textContent = '';
+      refreshing = false;
+    })
+    .catch(() => {
+      indicator.textContent = '갱신 실패';
+      refreshing = false;
+    });
 }
-setInterval(refreshBoth, REFRESH_MINUTES * 60 * 1000);
-document.getElementById('refreshBtn').addEventListener('click', refreshBoth);
+setInterval(refreshData, REFRESH_MINUTES * 60 * 1000);
+document.getElementById('refreshBtn').addEventListener('click', refreshData);
 </script>
 </body>
 </html>
