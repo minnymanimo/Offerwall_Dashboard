@@ -78,35 +78,48 @@
 
   /* ---- KPI ---- */
   .kpi-grid{margin-bottom:28px;}
-  .kpi-group{margin-bottom:22px;}
-  .kpi-group:last-child{margin-bottom:0;}
-  .kpi-group-header{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;
-    margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border);}
-  .kpi-group-title{font-family:var(--mono);font-size:12.5px;font-weight:700;color:var(--text);
-    letter-spacing:.06em;text-transform:uppercase;}
-  .kpi-group-total{font-family:var(--mono);font-size:13px;color:var(--text-dim);}
-  .kpi-group-note{color:var(--text-faint);font-size:10.5px;}
-  .kpi-group-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
-  .kpi-card{
-    background:var(--surface);border:1px solid var(--border);border-radius:14px;
-    padding:18px 18px 16px;position:relative;overflow:hidden;
-  }
-  .kpi-card::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;background:var(--accent-bar);}
-  .kpi-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
-  .kpi-label{font-size:12.5px;color:var(--text-dim);font-weight:600;}
-  .kpi-dot{width:7px;height:7px;border-radius:50%;background:var(--accent-bar);}
-  .kpi-value{font-family:var(--mono);font-size:22px;font-weight:700;letter-spacing:-0.02em;}
-  .kpi-unit{font-size:11px;color:var(--text-faint);margin-top:2px;}
-  .kpi-delta{font-family:var(--mono);font-size:11px;margin-top:10px;display:flex;align-items:center;gap:5px;color:var(--text-dim);}
-  .kpi-delta .arrow-up{color:var(--up);}
-  .kpi-delta .arrow-down{color:var(--down);}
-  .kpi-total{font-size:11px;color:var(--text-faint);margin-top:6px;}
-  .kpi-fx-ref{font-family:var(--mono);font-size:10px;color:var(--text-faint);margin-top:4px;}
-  .kpi-warn{
-    margin-top:10px;font-size:10.5px;color:var(--down);
-    background:rgba(246,120,158,0.08);border:1px solid rgba(246,120,158,0.25);
-    border-radius:6px;padding:4px 8px;display:inline-block;
-  }
+
+  /* ① 전체 — 가장 크게 */
+  .sum-hero{background:var(--surface);border:1px solid var(--border);border-radius:14px;
+    padding:20px 22px;margin-bottom:12px;}
+  .sh-label{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--text-dim);margin-bottom:8px;}
+  .sh-value{font-size:34px;font-weight:700;letter-spacing:-.02em;line-height:1.05;}
+  .sh-meta{font-family:var(--mono);font-size:12px;margin-top:9px;display:flex;align-items:center;
+    gap:5px;flex-wrap:wrap;}
+  .sh-dim{color:var(--text-faint);}
+  .sh-warn{color:var(--down);}
+
+  /* ② 두 사업 */
+  .sum-two{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;}
+  .sum-gcard{background:var(--surface);border:1px solid var(--border);border-radius:13px;
+    padding:16px 18px;position:relative;overflow:hidden;}
+  .sum-gcard::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;}
+  .sum-gcard.is-ow::before{background:var(--c-grp-offerwall);}
+  .sum-gcard.is-an::before{background:var(--c-grp-adnetwork);}
+  .sg-label{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;margin-bottom:7px;text-transform:uppercase;}
+  .sum-gcard.is-ow .sg-label{color:var(--c-grp-offerwall);}
+  .sum-gcard.is-an .sg-label{color:var(--c-grp-adnetwork);}
+  .sg-value{font-size:22px;font-weight:700;letter-spacing:-.01em;}
+  .sg-meta{font-family:var(--mono);font-size:11px;color:var(--text-faint);margin-top:6px;
+    display:flex;gap:10px;flex-wrap:wrap;}
+
+  /* ③ 업체별 순위 목록 */
+  .sum-list{background:var(--surface);border:1px solid var(--border);border-radius:13px;padding:6px 18px 12px;}
+  .sl-head,.sl-row{display:grid;grid-template-columns:150px 1fr 112px 78px;gap:12px;align-items:center;}
+  .sl-head{padding:10px 0 6px;font-family:var(--mono);font-size:10px;color:var(--text-faint);letter-spacing:.05em;}
+  .sl-head div:nth-child(3),.sl-head div:nth-child(4){text-align:right;}
+  .sl-row{padding:9px 0;border-bottom:1px solid var(--border);}
+  .sl-row:last-child{border-bottom:none;}
+  .sl-name{font-size:12.5px;display:flex;align-items:center;gap:7px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .sl-dot{width:9px;height:9px;border-radius:2px;flex:none;}
+  .sl-bar{height:7px;background:var(--surface-2);border-radius:4px;overflow:hidden;}
+  .sl-bar i{display:block;height:100%;border-radius:4px;}
+  .sl-amt{font-family:var(--mono);font-size:12.5px;text-align:right;font-weight:600;}
+  .sl-chg{font-family:var(--mono);font-size:11.5px;text-align:right;}
+  .sl-chg .arrow-up{color:var(--up);} .sl-chg .arrow-down{color:var(--down);}
+  .sh-meta .arrow-up,.sg-meta .arrow-up{color:var(--up);}
+  .sh-meta .arrow-down,.sg-meta .arrow-down{color:var(--down);}
 
   /* ---- Trend panel ---- */
   .trend-card{
@@ -158,6 +171,11 @@
   .chip-group{display:flex;flex-direction:column;gap:6px;}
   .chip-group-title{display:flex;align-items:center;gap:6px;font-family:var(--mono);
     font-size:10px;letter-spacing:.08em;color:var(--text-faint);text-transform:uppercase;}
+  .cg-all{font-family:var(--mono);font-size:9.5px;color:var(--text-faint);
+    background:var(--surface-2);border:1px solid var(--border);border-radius:5px;
+    padding:2px 8px;cursor:pointer;margin-left:2px;letter-spacing:0;text-transform:none;}
+  .cg-all:hover{color:var(--text);border-color:var(--accent);}
+  .cg-all[aria-pressed="true"]{color:var(--accent);border-color:var(--accent);background:var(--accent-soft);}
   .cg-bar{width:14px;height:3px;border-radius:2px;display:inline-block;}
   .chip-group-items{display:flex;flex-wrap:wrap;gap:8px;}
   .series-chip{
@@ -217,13 +235,15 @@
   .notes li b{color:var(--text);font-weight:600;}
 
   @media (max-width:860px){
-    .kpi-group-cards{grid-template-columns:1fr 1fr;}
+    .sum-two{grid-template-columns:1fr;}
+    .sl-head,.sl-row{grid-template-columns:120px 1fr 100px;}
+    .sl-head div:nth-child(4),.sl-chg{display:none;}
     .chart-box{height:320px;}
     .trend-head{flex-direction:column;}
   }
   @media (max-width:520px){
     .wrap{padding:28px 16px 48px;}
-    .kpi-group-cards{grid-template-columns:1fr;}
+    .sh-value{font-size:28px;}
     header{align-items:flex-start;}
     .meta-box{text-align:left;}
     .refresh-row{justify-content:flex-start;}
@@ -272,11 +292,6 @@
         <div class="trend-sub" id="trendSub">–</div>
       </div>
       <div class="controls">
-        <div class="seg" id="viewModeSeg">
-          <button data-view="vendor" class="active">벤더별</button>
-          <button data-view="group">그룹별</button>
-          <button data-view="total">합계만</button>
-        </div>
         <div class="seg" id="presetSeg">
           <button data-preset="mtd" class="active">이번 달</button>
           <button data-preset="lastmonth">저번 달</button>
@@ -303,8 +318,6 @@
     <div class="series-bar">
       <div class="series-toggles" id="seriesToggles"></div>
       <div class="series-actions">
-        <button type="button" id="selectAllBtn">모두 표시</button>
-        <button type="button" id="clearAllBtn">모두 숨김</button>
       </div>
     </div>
     <div class="trend-foot">
@@ -361,89 +374,105 @@ let scaleMode = 'linear';
 let activePreset = 'all';
 // 5개 계열(4개 벤더 + 합계)의 표시 여부 — 기간/축을 바꿔도 유지됨
 let seriesVisible = {};
-// 그래프 보기 방식: 'vendor'(벤더별 개별 선, 기본) | 'group'(Offerwall/AdNetwork 2선) | 'total'(합계선만)
-let viewMode = 'vendor';
 
 /* ---------- KPI ---------- */
+const TOTAL_KEY = '__total__';
 const GROUP_LABELS = { Offerwall: 'Offerwall', AdNetwork: 'AdNetwork' };
 const GROUP_ORDER = ['Offerwall', 'AdNetwork'];
 
 function renderKpis(){
   kpiGrid.innerHTML = '';
-  const {vendors} = PAYLOAD;
+  const {vendors, dates} = PAYLOAD;
+  const n = endIdx - startIdx + 1;
 
-  GROUP_ORDER.forEach(groupKey => {
-    const entries = Object.entries(vendors).filter(([, v]) => v.group === groupKey);
-    if (!entries.length) return;
+  // 환율 변환이 실패해 USD 원본으로 남은 벤더는 원화 합계에 섞을 수 없다.
+  const krwKeys = Object.keys(vendors).filter(k => vendors[k].currency === 'KRW');
+  const usdLeft = Object.keys(vendors).filter(k => vendors[k].currency !== 'KRW');
 
-    let groupTotal = 0, groupHasAny = false, groupSkippedUsd = false;
-    entries.forEach(([, v]) => {
-      // USD 변환이 실패해 원본 USD로 남아있는 벤더는 원화 합계에 섞을 수 없어 그룹
-      // 합계에서 제외하고, 그 사실을 표시한다(조용히 잘못된 합계를 보여주지 않기 위해).
-      if (v.currency === 'USD'){ groupSkippedUsd = true; return; }
-      for (let i = startIdx; i <= endIdx; i++){
-        if (v.data[i] !== null){ groupTotal += v.data[i]; groupHasAny = true; }
-      }
-    });
+  const sumRange = (key, s, e) => {
+    let sum = 0, any = false;
+    for (let i = s; i <= e; i++){
+      const v = vendors[key].data[i];
+      if (v !== null && v !== undefined){ sum += v; any = true; }
+    }
+    return any ? sum : null;
+  };
+  const sumKeys = (keys, s, e) => {
+    let sum = 0, any = false;
+    keys.forEach(k => { const v = sumRange(k, s, e); if (v !== null){ sum += v; any = true; } });
+    return any ? sum : null;
+  };
 
-    const groupWrap = document.createElement('div');
-    groupWrap.className = 'kpi-group';
-    groupWrap.innerHTML = `
-      <div class="kpi-group-header">
-        <span class="kpi-group-title">${GROUP_LABELS[groupKey]}</span>
-        <span class="kpi-group-total">선택 기간 합계 ${groupHasAny ? fmt(groupTotal) : '–'}${groupSkippedUsd ? ' <span class="kpi-group-note">(환율 미확보 벤더 제외)</span>' : ''}</span>
-      </div>
-      <div class="kpi-group-cards"></div>
-    `;
-    const cardsBox = groupWrap.querySelector('.kpi-group-cards');
+  // 같은 길이의 직전 기간과 비교 — 한 달을 보는데 '전일 대비'를 쓰면 노이즈만 크다.
+  const prevEnd = startIdx - 1, prevStart = startIdx - n;
+  const hasPrev = prevStart >= 0;
+  const changeHtml = (cur, keys) => {
+    if (!hasPrev || cur === null) return '';
+    const prev = sumKeys(keys, prevStart, prevEnd);
+    if (prev === null || prev <= 0) return '';
+    const ch = ((cur / prev) - 1) * 100;
+    return `<span class="${ch >= 0 ? 'arrow-up' : 'arrow-down'}">${ch >= 0 ? '▲' : '▼'} ${Math.abs(ch).toFixed(1)}%</span>`;
+  };
 
-    entries.forEach(([key, v]) => {
-      const color = colorMap[key];
-      const delta = (v.prevVal !== null && v.prevVal !== 0)
-        ? ((v.latestVal - v.prevVal) / Math.abs(v.prevVal)) * 100
-        : null;
-      const deltaHtml = delta === null
-        ? `<span>전일 대비 비교 불가</span>`
-        : `<span class="${delta >= 0 ? 'arrow-up' : 'arrow-down'}">${delta >= 0 ? '▲' : '▼'} ${Math.abs(delta).toFixed(1)}%</span><span>전일 대비</span>`;
+  const total = sumKeys(krwKeys, startIdx, endIdx);
 
-      let periodSum = 0, hasAny = false;
-      for (let i = startIdx; i <= endIdx; i++){
-        if (v.data[i] !== null){ periodSum += v.data[i]; hasAny = true; }
-      }
+  // ① 전체 (가장 크게)
+  const hero = document.createElement('div');
+  hero.className = 'sum-hero';
+  const chgAll = changeHtml(total, krwKeys);
+  const avg = (total !== null && n) ? total / n : null;
+  hero.innerHTML =
+    `<div class="sh-label">전체 매출 · ${dates[startIdx]} ~ ${dates[endIdx]} (${n}일)</div>` +
+    `<div class="sh-value">${total === null ? '–' : fmt(total)}</div>` +
+    `<div class="sh-meta">${chgAll ? chgAll + ` <span class="sh-dim">직전 ${n}일 대비</span> &nbsp;·&nbsp; ` : ''}` +
+    `<span class="sh-dim">일평균 ${avg === null ? '–' : fmt(avg)}</span>` +
+    (usdLeft.length ? ` &nbsp;·&nbsp; <span class="sh-warn">환율 미확보 ${usdLeft.length}곳 제외</span>` : '') +
+    `</div>`;
+  kpiGrid.appendChild(hero);
 
-      const sigGapDays = v.gaps
-        .filter(g => g[1] - g[0] >= 2)
-        .reduce((s,g) => s + (g[1]-g[0]+1), 0);
-      const warnHtml = sigGapDays > 0 ? `<div class="kpi-warn">⚠ 데이터 공백 ${sigGapDays}일</div>` : '';
-
-      const fxRefHtml = v.converted
-        ? `<div class="kpi-fx-ref">원본 $${numFmt2.format(v.latestValUsd)} · $1 ≈ ₩${fmt(v.fxRateAtLatest)}</div>`
-        : (v.currency === 'USD' ? `<div class="kpi-fx-ref">⚠ 환율 조회 실패 — USD 원본 표시</div>` : '');
-
-      const card = document.createElement('div');
-      card.className = 'kpi-card';
-      card.style.setProperty('--accent-bar', color);
-      card.innerHTML = `
-        <div class="kpi-top">
-          <div class="kpi-label">${v.label}</div>
-          <div class="kpi-dot"></div>
-        </div>
-        <div class="kpi-value">${v.currency === 'USD' && !v.converted ? '$' : ''}${fmt(v.latestVal)}</div>
-        <div class="kpi-unit">${v.unit} · ${v.latestDate ? shortDate(v.latestDate)+' 기준' : '데이터 없음'}</div>
-        ${fxRefHtml}
-        <div class="kpi-delta">${deltaHtml}</div>
-        <div class="kpi-total">선택 기간 합계 ${hasAny ? fmt(periodSum) : '–'}</div>
-        ${warnHtml}
-      `;
-      cardsBox.appendChild(card);
-    });
-
-    kpiGrid.appendChild(groupWrap);
+  // ② 두 사업
+  const two = document.createElement('div');
+  two.className = 'sum-two';
+  GROUP_ORDER.forEach(g => {
+    const keys = krwKeys.filter(k => vendors[k].group === g);
+    if (!keys.length) return;
+    const amt = sumKeys(keys, startIdx, endIdx);
+    const share = (total && amt !== null) ? (amt / total * 100) : null;
+    const card = document.createElement('div');
+    card.className = 'sum-gcard ' + (g === 'Offerwall' ? 'is-ow' : 'is-an');
+    card.innerHTML =
+      `<div class="sg-label">${GROUP_LABELS[g]}</div>` +
+      `<div class="sg-value">${amt === null ? '–' : fmt(amt)}</div>` +
+      `<div class="sg-meta">` +
+        (share === null ? '' : `<span>비중 ${share.toFixed(1)}%</span>`) +
+        (changeHtml(amt, keys) || '') +
+      `</div>`;
+    two.appendChild(card);
   });
+  kpiGrid.appendChild(two);
+
+  // ③ 업체별 — 카드 대신 막대 있는 순위 목록 (규모 차이가 즉시 보이고 공간도 덜 쓴다)
+  const rows = krwKeys.map(k => ({key: k, label: vendors[k].label,
+                                  amt: sumRange(k, startIdx, endIdx) })).
+                filter(r => r.amt !== null).sort((a, b) => b.amt - a.amt);
+  if (rows.length){
+    const maxAmt = Math.max(...rows.map(r => r.amt), 1);
+    const list = document.createElement('div');
+    list.className = 'sum-list';
+    list.innerHTML = '<div class="sl-head"><div>업체</div><div>비중</div><div>기간 합계</div><div>직전 대비</div></div>' +
+      rows.map(r => {
+        const share = total ? (r.amt / total * 100) : 0;
+        return `<div class="sl-row">` +
+          `<div class="sl-name"><span class="sl-dot" style="background:${colorMap[r.key]}"></span>${r.label}</div>` +
+          `<div class="sl-bar"><i style="width:${Math.max(0, r.amt / maxAmt * 100)}%;background:${colorMap[r.key]}"></i></div>` +
+          `<div class="sl-amt">${fmt(r.amt)}</div>` +
+          `<div class="sl-chg">${changeHtml(r.amt, [r.key]) || '<span class="sh-dim">–</span>'}</div>` +
+        `</div>`;
+      }).join('');
+    kpiGrid.appendChild(list);
+  }
 }
 
-/* ---------- 통합 추이 차트 ---------- */
-const TOTAL_KEY = '__total__';
 
 const GROUP_KEY_PREFIX = '__group__';
 
@@ -469,68 +498,52 @@ function buildDatasets(){
     return s;
   });
 
-  const totalLine = (label, key, data, color, extra = {}) => Object.assign({
+  const aggLine = (label, key, data, color, extra = {}) => Object.assign({
     label, _key: key, data,
     borderColor: color, backgroundColor: color,
-    spanGaps: false, tension: 0.3,
-    borderWidth: 2.4, pointRadius: 0, pointHoverRadius: 5,
+    spanGaps: false, tension: 0,
+    borderWidth: 1.8, borderDash: [5, 4],  // 합계선은 점선 — 개별 선과 성격이 다름을 표시
+    pointRadius: 0, pointHoverRadius: 5,
     hidden: seriesVisible[key] === false,
     _usd: null,
   }, extra);
 
-  if (viewMode === 'total'){
-    // 합계만 — 켜둔 벤더 전체를 더한 선 하나. 개별 벤더 선은 그리지 않는다.
-    const datasets = onKeys.length ? [
-      totalLine('합계 (' + onKeys.length + '개 항목)', TOTAL_KEY, sumOf(onKeys), getVar('--c-total'),
-        {_onCount: onKeys.length, borderWidth: 2.6})
-    ] : [];
-    return {labels, datasets, excluded};
-  }
+  // 켠 것이 그대로 그려지는 방식 — 별도의 '보기 모드'가 없다.
+  // 개별 업체 선 + (켰다면) 묶음 합계선 + (켰다면) 전체 합계선.
+  const datasets = [];
 
-  if (viewMode === 'group'){
-    // 그룹별 — Offerwall / AdNetwork 두 선. 각 그룹 안에서 켜둔 벤더만 합산한다.
-    const datasets = [];
-    GROUP_ORDER.forEach(g => {
-      const keys = onKeys.filter(k => vendors[k].group === g);
-      if (!keys.length) return;
-      const key = GROUP_KEY_PREFIX + g;
-      datasets.push(totalLine(
-        GROUP_LABELS[g] + ' (' + keys.length + '개)', key, sumOf(keys),
-        getVar(g === 'Offerwall' ? '--c-grp-offerwall' : '--c-grp-adnetwork'),
-        {_onCount: keys.length}));
-    });
-    // 두 그룹이 다 있을 때만 전체 합계선을 함께 (한 그룹뿐이면 그 선과 겹쳐 무의미)
-    if (datasets.length > 1){
-      datasets.push(totalLine('합계', TOTAL_KEY, sumOf(onKeys), getVar('--c-total'),
-        {_onCount: onKeys.length, borderDash: [5,4], borderWidth: 1.5}));
-    }
-    return {labels, datasets, excluded};
-  }
-
-  // 벤더별(기본) — 지금까지의 동작 그대로
-  const datasets = krwKeys.map(key => {
+  krwKeys.forEach(key => {
+    if (seriesVisible[key] === false) return;
     const v = vendors[key];
-    return {
+    datasets.push({
       label: v.label,
       _key: key,
       data: v.data.slice(startIdx, endIdx + 1),
       borderColor: colorMap[key],
       backgroundColor: colorMap[key],
       spanGaps: false,
-      tension: 0.3,
+      tension: 0,
       borderWidth: 2,
       pointRadius: labels.length <= 31 ? 2.5 : 0,
       pointHoverRadius: 5,
-      hidden: seriesVisible[key] === false,
+      hidden: false,
       _usd: v.converted ? v.dataUsd.slice(startIdx, endIdx + 1) : null,
-    };
+    });
   });
 
-  // 합계 = 현재 켜져 있는 항목만 더한 값. 켜진 항목이 1개 이하면 합계가 그 항목과
-  // 완전히 겹쳐 무의미하므로 아예 만들지 않는다.
-  if (onKeys.length > 1){
-    datasets.push(totalLine('합계', TOTAL_KEY, sumOf(onKeys), getVar('--c-total'),
-      {_onCount: onKeys.length, borderDash: [5,4], borderWidth: 1.5}));
+  GROUP_ORDER.forEach(g => {
+    const key = GROUP_KEY_PREFIX + g;
+    if (seriesVisible[key] === false || seriesVisible[key] === undefined) return;
+    const keys = krwKeys.filter(k => vendors[k].group === g);
+    if (!keys.length) return;
+    datasets.push(aggLine(GROUP_LABELS[g] + ' 합계', key, sumOf(keys),
+      getVar(g === 'Offerwall' ? '--c-grp-offerwall' : '--c-grp-adnetwork'),
+      {_onCount: keys.length}));
+  });
+
+  if (seriesVisible[TOTAL_KEY] === true){
+    datasets.push(aggLine('전체 합계', TOTAL_KEY, sumOf(krwKeys), getVar('--c-total'),
+      {_onCount: krwKeys.length}));
   }
 
   return {labels, datasets, excluded};
@@ -544,16 +557,27 @@ function renderSeriesToggles(datasets){
   const {vendors} = PAYLOAD;
   const krwKeys = Object.keys(vendors).filter(k => vendors[k].currency === 'KRW');
 
-  // 기간 합계와 데이터 일수를 함께 계산 (벤더마다 수집 시작일이 달라, 금액만
-  // 나란히 보면 규모를 오해할 수 있어서)
+  // 기간 합계와 데이터 일수 (벤더마다 수집 시작일이 달라, 금액만 나란히 보면 규모를 오해할 수 있어서)
   const statsOf = arr => {
     let sum = 0, days = 0;
     arr.forEach(v => { if (v !== null && v !== undefined){ sum += v; days++; } });
     return {sum, days};
   };
+  const sliceOf = key => vendors[key].data.slice(startIdx, endIdx + 1);
+  const sumSeries = keys => {
+    const out = [];
+    for (let i = startIdx; i <= endIdx; i++){
+      let s = null;
+      keys.forEach(k => { const v = vendors[k].data[i]; if (v !== null) s = (s === null ? 0 : s) + v; });
+      out.push(s);
+    }
+    return out;
+  };
 
-  const makeChip = ({key, label, color, data, dashed, meta}) => {
-    const on = seriesVisible[key] !== false;
+  const makeChip = ({key, label, color, data, dashed, metaText}) => {
+    const on = key === TOTAL_KEY || key.startsWith(GROUP_KEY_PREFIX)
+      ? seriesVisible[key] === true          // 합계선은 기본 꺼짐 (개별 선이 눌리지 않도록)
+      : seriesVisible[key] !== false;        // 업체는 기본 켜짐
     const {sum, days} = statsOf(data);
     const btn = document.createElement('button');
     btn.type = 'button';
@@ -563,63 +587,59 @@ function renderSeriesToggles(datasets){
     btn.style.setProperty('--chip-color', color);
     btn.innerHTML = `<span class="swatch"></span><span>${label}</span>` +
       `<span class="chip-sum">${days ? '₩' + numFmt0.format(sum) : '–'}</span>` +
-      `<span class="chip-days">${meta != null ? meta : days + '일'}</span>`;
+      `<span class="chip-days">${metaText != null ? metaText : days + '일'}</span>`;
     return btn;
   };
 
-  // 그룹별 보기에서는 칩도 그룹 단위로 — 이러면 Offerwall만/AdNetwork만 켜서 볼 수 있다.
-  if (viewMode === 'group'){
-    datasets.filter(d => d._key !== TOTAL_KEY).forEach(ds => {
-      box.appendChild(makeChip({key: ds._key, label: ds.label, color: ds.borderColor,
-                                data: ds.data, meta: ds._onCount + '개 항목'}));
-    });
-  } else {
-    // 벤더별·합계만 보기에서는 벤더 칩을 그룹 소제목 아래로 묶어 보여준다.
-    // (어떤 업체가 Offerwall이고 어떤 업체가 AdNetwork인지 이름만으로는 알 수 없으므로)
-    GROUP_ORDER.forEach(g => {
-      const keys = krwKeys.filter(k => vendors[k].group === g);
-      if (!keys.length) return;
-      const wrap = document.createElement('div');
-      wrap.className = 'chip-group';
-      const head = document.createElement('div');
-      head.className = 'chip-group-title';
-      head.innerHTML = `<span class="cg-bar" style="background:${getVar(g === 'Offerwall' ? '--c-grp-offerwall' : '--c-grp-adnetwork')}"></span>${GROUP_LABELS[g]}`;
-      wrap.appendChild(head);
-      const row = document.createElement('div');
-      row.className = 'chip-group-items';
-      keys.forEach(key => {
-        const v = vendors[key];
-        row.appendChild(makeChip({key, label: v.label, color: colorMap[key],
-                                  data: v.data.slice(startIdx, endIdx + 1)}));
-      });
-      wrap.appendChild(row);
-      box.appendChild(wrap);
-    });
-  }
+  GROUP_ORDER.forEach(g => {
+    const keys = krwKeys.filter(k => vendors[k].group === g);
+    if (!keys.length) return;
+    const allOn = keys.every(k => seriesVisible[k] !== false);
 
-  // 합계 칩은 합계선이 '보조'로 그려지는 보기에서만. 합계만 보기에서는 합계선이
-  // 유일한 선이라, 칩으로 끄면 빈 차트가 되어버리므로 칩을 두지 않는다.
-  const totalDs = datasets.find(d => d._key === TOTAL_KEY);
-  if (totalDs && viewMode !== 'total'){
     const wrap = document.createElement('div');
     wrap.className = 'chip-group';
-    wrap.appendChild(makeChip({key: TOTAL_KEY, label: '합계', color: totalDs.borderColor,
-                               data: totalDs.data, dashed: true,
-                               meta: totalDs._onCount + '개 항목'}));
+    const head = document.createElement('div');
+    head.className = 'chip-group-title';
+    head.innerHTML =
+      `<span class="cg-bar" style="background:${getVar(g === 'Offerwall' ? '--c-grp-offerwall' : '--c-grp-adnetwork')}"></span>` +
+      `${GROUP_LABELS[g]}` +
+      `<button type="button" class="cg-all" data-group="${g}" aria-pressed="${allOn}">모두 켜기</button>`;
+    wrap.appendChild(head);
+
+    const row = document.createElement('div');
+    row.className = 'chip-group-items';
+    keys.forEach(key => {
+      row.appendChild(makeChip({key, label: vendors[key].label,
+                                color: colorMap[key], data: sliceOf(key)}));
+    });
+    // 묶음 합계 칩 — 개별 업체와 성격이 다르므로 점선 스와치로 구분
+    row.appendChild(makeChip({
+      key: GROUP_KEY_PREFIX + g,
+      label: GROUP_LABELS[g] + ' 합계',
+      color: getVar(g === 'Offerwall' ? '--c-grp-offerwall' : '--c-grp-adnetwork'),
+      data: sumSeries(keys), dashed: true, metaText: keys.length + '곳',
+    }));
+    wrap.appendChild(row);
     box.appendChild(wrap);
-  }
+  });
+
+  // 전체 합계
+  const wrap2 = document.createElement('div');
+  wrap2.className = 'chip-group';
+  const head2 = document.createElement('div');
+  head2.className = 'chip-group-title';
+  head2.innerHTML = '<span class="cg-bar" style="background:var(--c-total)"></span>전체';
+  wrap2.appendChild(head2);
+  const row2 = document.createElement('div');
+  row2.className = 'chip-group-items';
+  row2.appendChild(makeChip({
+    key: TOTAL_KEY, label: '전체 합계', color: getVar('--c-total'),
+    data: sumSeries(krwKeys), dashed: true, metaText: krwKeys.length + '곳',
+  }));
+  wrap2.appendChild(row2);
+  box.appendChild(wrap2);
 }
 
-function setAllSeries(visible){
-  // #seriesToggles에 실제로 그려진 칩만 훑으면 안 된다 — 합계 칩은 켜진 항목이
-  // 2개 이상일 때만 그려지는 조건부 요소라, "모두 숨김" 직후처럼 합계 칩이 잠깐
-  // DOM에서 사라진 상태일 때 "모두 표시"를 눌러도 합계의 숨김 상태가 안 풀렸다.
-  // 그래서 항상 벤더 전체 + 합계 키를 직접 지정해서 확실히 갱신한다.
-  Object.keys(PAYLOAD.vendors).forEach(k => { seriesVisible[k] = visible; });
-  GROUP_ORDER.forEach(g => { seriesVisible[GROUP_KEY_PREFIX + g] = visible; });
-  seriesVisible[TOTAL_KEY] = visible;
-  renderTrend();
-}
 
 function renderTrend(){
  try {
@@ -843,6 +863,13 @@ function init(payload){
   sIn.min = dates[0]; sIn.max = dates[dates.length-1];
   eIn.min = dates[0]; eIn.max = dates[dates.length-1];
 
+  // 기본 표시: 오퍼월 합계 + 애드네트워크 합계 두 선만.
+  // 업체 6개를 한꺼번에 그리면 선이 얽혀 읽기 어렵고, 먼저 보고 싶은 건 대개
+  // "두 사업이 각각 어떻게 움직이는가"이기 때문. 개별 업체는 아래에서 켜서 본다.
+  Object.keys(payload.vendors).forEach(k => { seriesVisible[k] = false; });
+  GROUP_ORDER.forEach(g => { seriesVisible[GROUP_KEY_PREFIX + g] = true; });
+  seriesVisible[TOTAL_KEY] = false;
+
   // 기본값 = 이번 달(데이터상 최신 날짜 기준)
   applyPreset('mtd');
 }
@@ -885,14 +912,6 @@ function reinit(payload){
 }
 
 /* ---------- 이벤트 ---------- */
-document.getElementById('viewModeSeg').addEventListener('click', (ev) => {
-  const btn = ev.target.closest('button');
-  if (!btn) return;
-  viewMode = btn.dataset.view;
-  document.querySelectorAll('#viewModeSeg button').forEach(b =>
-    b.classList.toggle('active', b === btn));
-  renderTrend();
-});
 
 document.getElementById('presetSeg').addEventListener('click', (ev) => {
   const btn = ev.target.closest('button');
@@ -914,15 +933,26 @@ document.getElementById('startInput').addEventListener('change', onDateInputChan
 document.getElementById('endInput').addEventListener('change', onDateInputChange);
 
 document.getElementById('seriesToggles').addEventListener('click', (ev) => {
+  // 그룹 헤더의 '모두 켜기/끄기'
+  const allBtn = ev.target.closest('.cg-all');
+  if (allBtn){
+    const g = allBtn.dataset.group;
+    const keys = Object.keys(PAYLOAD.vendors)
+      .filter(k => PAYLOAD.vendors[k].currency === 'KRW' && PAYLOAD.vendors[k].group === g);
+    const allOn = keys.every(k => seriesVisible[k] !== false);
+    keys.forEach(k => { seriesVisible[k] = !allOn; });
+    renderTrend();
+    return;
+  }
   const btn = ev.target.closest('.series-chip');
   if (!btn) return;
   const key = btn.dataset.key;
-  seriesVisible[key] = !(seriesVisible[key] !== false);
+  // 합계선은 기본 꺼짐이라 판정 기준이 반대다
+  const isAgg = key === TOTAL_KEY || key.startsWith(GROUP_KEY_PREFIX);
+  seriesVisible[key] = isAgg ? !(seriesVisible[key] === true) : !(seriesVisible[key] !== false);
   renderTrend();
 });
 
-document.getElementById('selectAllBtn').addEventListener('click', () => setAllSeries(true));
-document.getElementById('clearAllBtn').addEventListener('click', () => setAllSeries(false));
 
 /* ---------- 데이터 로드 (data.json은 GitHub Actions가 주기적으로 갱신) ---------- */
 // GitHub Pages는 CDN(Fastly)을 거치기 때문에, 매번 쿼리스트링을 다르게 붙여서
