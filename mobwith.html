@@ -270,6 +270,14 @@
     padding:10px;width:280px;box-shadow:0 8px 24px rgba(0,0,0,0.4);
   }
   .placement-filter-dropdown.open{display:block;}
+  .placement-filter-search{
+    width:100%;box-sizing:border-box;margin-bottom:8px;
+    font-family:var(--sans);font-size:12px;color:var(--text);
+    background:var(--surface-2);border:1px solid var(--border);border-radius:7px;padding:6px 10px;
+  }
+  .placement-filter-search:focus{outline:none;border-color:var(--accent);}
+  .placement-filter-search::placeholder{color:var(--text-faint);}
+  .placement-filter-empty{font-size:11.5px;color:var(--text-faint);padding:10px 4px;text-align:center;}
   .placement-filter-actions{display:flex;gap:8px;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid var(--border);}
   .placement-filter-actions button{
     font-family:var(--mono);font-size:10.5px;color:var(--text-dim);background:var(--surface-2);
@@ -412,8 +420,9 @@
         <button data-s="direct">직광고</button>
       </div>
       <div class="seg" id="mwa-presetSeg">
+        <button data-preset="mtd" class="active">이번 달</button>
         <button data-preset="1">최근 1일</button>
-        <button data-preset="7" class="active">7일</button>
+        <button data-preset="7">7일</button>
         <button data-preset="14">14일</button>
         <button data-preset="30">30일</button>
         <button data-preset="all">전체</button>
@@ -456,11 +465,14 @@
         지면 선택 <span id="mwb-placementFilterCount">(전체)</span>
       </button>
       <div class="placement-filter-dropdown" id="mwb-placementFilterDropdown">
+        <input type="text" class="placement-filter-search" id="mwb-placementSearch"
+               placeholder="지면 이름 검색" autocomplete="off" />
         <div class="placement-filter-actions">
           <button type="button" id="mwb-placementSelectAll">전체 선택</button>
           <button type="button" id="mwb-placementSelectNone">전체 해제</button>
         </div>
         <div class="placement-filter-list" id="mwb-placementFilterList"></div>
+        <div class="placement-filter-empty" id="mwb-placementNoMatch" style="display:none">검색 결과가 없습니다.</div>
       </div>
     </div>
   </div>
@@ -570,11 +582,37 @@ function clampIndices(){
   endIdx = Math.max(startIdx, Math.min(endIdx, n - 1));
 }
 
+// 저번 달 같은 기간 비교용 (예: 9/1~9/7 -> 8/1~8/7). 저번 달에 없는 날짜(3/31 등)는
+// 그 달 마지막 날로 당긴다.
+function shiftMonth(dateStr){
+  const [y, m, d] = dateStr.split('-').map(Number);
+  let py = y, pm = m - 1;
+  if (pm === 0){ pm = 12; py = y - 1; }
+  const lastDay = new Date(py, pm, 0).getDate();
+  return `${py}-${String(pm).padStart(2,'0')}-${String(Math.min(d, lastDay)).padStart(2,'0')}`;
+}
+function prevMonthRange(startStr, endStr, dates){
+  const ps = shiftMonth(startStr), pe = shiftMonth(endStr);
+  let s = -1, e = -1;
+  for (let i = 0; i < dates.length; i++){
+    if (dates[i] >= ps && dates[i] <= pe){ if (s === -1) s = i; e = i; }
+  }
+  return s === -1 ? null : [s, e];
+}
+
 function applyPreset(preset){
   activePreset = preset;
   const n = PAYLOAD.dates.length;
   endIdx = n - 1;
-  startIdx = (preset === 'all') ? 0 : Math.max(0, n - parseInt(preset, 10));
+  if (preset === 'mtd'){
+    // 이번 달 누적 — 데이터상 최신 날짜가 속한 달의 1일부터
+    const ym = PAYLOAD.dates[n-1].slice(0, 7);
+    let s = n - 1;
+    for (let i = n - 1; i >= 0; i--){ if (PAYLOAD.dates[i].slice(0,7) === ym) s = i; else break; }
+    startIdx = s;
+  } else {
+    startIdx = (preset === 'all') ? 0 : Math.max(0, n - parseInt(preset, 10));
+  }
   clampIndices();
   syncInputs();
   renderAll();
@@ -817,20 +855,17 @@ function renderSummary3(){
   document.getElementById('pctSsp').textContent = ssp == null ? '' : pct(ssp);
   document.getElementById('pctDirect').textContent = dir == null ? '' : pct(dir);
 
-  // 같은 길이의 직전 기간과 비교 (기간이 데이터 시작을 넘어가면 비교 안 함)
+  // 저번 달 같은 기간과 비교 (예: 9/1~9/7 -> 8/1~8/7). 그 구간에 데이터가 없으면 표시하지 않는다.
   const delta = document.getElementById('splitDelta');
-  const prevEnd = startIdx - 1, prevStart = startIdx - n;
-  if (prevStart >= 0 && all != null){
-    const prev = aggregate(prevStart, prevEnd, 'all').revenue;
+  const pr = prevMonthRange(PAYLOAD.dates[startIdx], PAYLOAD.dates[endIdx], PAYLOAD.dates);
+  delta.innerHTML = '';
+  if (pr && all != null){
+    const prev = aggregate(pr[0], pr[1], 'all').revenue;
     if (prev != null && prev > 0){
       const ch = ((all / prev) - 1) * 100;
       delta.innerHTML = `<span class="${ch>=0?'up':'down'}">${ch>=0?'▲':'▼'} ${Math.abs(ch).toFixed(1)}%</span>`
-        + `<br/>직전 ${n}일 대비`;
-    } else {
-      delta.innerHTML = '';
+        + `<br/>저번 달 같은 기간 대비`;
     }
-  } else {
-    delta.innerHTML = '';
   }
 }
 
@@ -866,7 +901,7 @@ function init(payload){
   sIn.min = payload.dates[0]; sIn.max = payload.dates[payload.dates.length-1];
   eIn.min = payload.dates[0]; eIn.max = payload.dates[payload.dates.length-1];
 
-  applyPreset('7');
+  applyPreset('mtd');
 }
 
 function reinit(payload){
@@ -1058,7 +1093,14 @@ function renderPlacementFilterList(){
   DATA.placements.forEach(p => knownPlacementIds.add(p.id));
 
   const box = document.getElementById('mwb-placementFilterList');
-  box.innerHTML = DATA.placements.map(p => {
+  const q = (document.getElementById('mwb-placementSearch').value || '').trim().toLowerCase();
+
+  // 가나다순 정렬 — 매출순으로 두면 갱신될 때마다 순서가 바뀌어 원하는 지면을 찾기 어렵다.
+  // localeCompare('ko')로 한글 자모 순서를 제대로 맞춘다.
+  const sorted = [...DATA.placements].sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+  const shown = q ? sorted.filter(p => p.name.toLowerCase().includes(q)) : sorted;
+
+  box.innerHTML = shown.map(p => {
     const checked = !placementFilter || placementFilter.has(p.id);
     const shortName = p.name.replace(/^티머니고_/, '');
     return `<label class="placement-filter-item">
@@ -1066,6 +1108,7 @@ function renderPlacementFilterList(){
       <span title="${p.name}">${shortName} (${p.os})</span>
     </label>`;
   }).join('');
+  document.getElementById('mwb-placementNoMatch').style.display = shown.length ? 'none' : '';
   updatePlacementFilterCount();
 }
 
@@ -1081,13 +1124,35 @@ function updatePlacementFilterCount(){
   }
 }
 
-function applyPlacementFilterChange(){
-  const boxes = [...document.querySelectorAll('#mwb-placementFilterList input[type="checkbox"]')];
-  const checkedIds = boxes.filter(b=>b.checked).map(b=>Number(b.dataset.id));
-  placementFilter = (checkedIds.length === DATA.placements.length) ? null : new Set(checkedIds);
+// 검색으로 목록이 걸러져 있으면 '화면에 보이는 체크박스'만 훑어서는 안 된다 —
+// 검색어에 안 걸린 지면이 조용히 필터에서 빠져버린다. 그래서 전체 선택 집합을
+// 별도로 유지하고, 바뀐 항목만 그 집합에 반영한다.
+function currentSelection(){
+  if (placementFilter) return new Set(placementFilter);
+  return new Set(DATA.placements.map(p => p.id));   // null = 전체 선택 상태
+}
+function commitSelection(sel){
+  placementFilter = (sel.size === DATA.placements.length) ? null : sel;
   updatePlacementFilterCount();
   if(openId!=null && placementFilter && !placementFilter.has(openId)) openId=null;
   renderScatter(); renderHeat();
+}
+function applyPlacementFilterChange(ev){
+  const cb = ev && ev.target && ev.target.matches('input[type="checkbox"]') ? ev.target : null;
+  if (!cb) return;
+  const id = Number(cb.dataset.id);
+  const sel = currentSelection();
+  if (cb.checked) sel.add(id); else sel.delete(id);
+  commitSelection(sel);
+}
+// '전체 선택/해제'는 지금 화면에 보이는(=검색에 걸린) 항목에만 적용한다.
+function setShownPlacements(checked){
+  const ids = [...document.querySelectorAll('#mwb-placementFilterList input[type="checkbox"]')]
+    .map(b => Number(b.dataset.id));
+  const sel = currentSelection();
+  ids.forEach(id => { if (checked) sel.add(id); else sel.delete(id); });
+  commitSelection(sel);
+  renderPlacementFilterList();
 }
 
 document.getElementById('mwb-placementFilterBtn').addEventListener('click', (e)=>{
@@ -1095,14 +1160,11 @@ document.getElementById('mwb-placementFilterBtn').addEventListener('click', (e)=
   document.getElementById('mwb-placementFilterDropdown').classList.toggle('open');
 });
 document.getElementById('mwb-placementFilterList').addEventListener('change', applyPlacementFilterChange);
-document.getElementById('mwb-placementSelectAll').addEventListener('click', ()=>{
-  document.querySelectorAll('#mwb-placementFilterList input').forEach(b=>b.checked=true);
-  applyPlacementFilterChange();
-});
-document.getElementById('mwb-placementSelectNone').addEventListener('click', ()=>{
-  document.querySelectorAll('#mwb-placementFilterList input').forEach(b=>b.checked=false);
-  applyPlacementFilterChange();
-});
+document.getElementById('mwb-placementSelectAll').addEventListener('click', ()=> setShownPlacements(true));
+document.getElementById('mwb-placementSelectNone').addEventListener('click', ()=> setShownPlacements(false));
+document.getElementById('mwb-placementSearch').addEventListener('input', renderPlacementFilterList);
+// 드롭다운 안 클릭이 바깥 클릭으로 잡혀 닫히지 않도록
+document.getElementById('mwb-placementSearch').addEventListener('click', e=> e.stopPropagation());
 document.addEventListener('click', (e)=>{
   const dd = document.getElementById('mwb-placementFilterDropdown');
   const btn = document.getElementById('mwb-placementFilterBtn');
@@ -1524,7 +1586,7 @@ function initPage(payload){
   renderPlacementFilterList();
   openId=null;
   if (modalState) closeModal();
-  applyPreset(activePreset || '7');
+  applyPreset(activePreset || 'mtd');
 }
   return { init: initPage, reinit: initPage };
 })();
