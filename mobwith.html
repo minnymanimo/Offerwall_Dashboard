@@ -313,27 +313,38 @@
   table.heat td.clickable:hover{outline:1px solid var(--accent);outline-offset:-1px;}
 
   .seg-caption{font-size:12.5px;color:var(--text-faint);margin-right:2px;}
-  .split-card{background:var(--surface);border:1px solid var(--border);border-radius:13px;
-    padding:18px 20px;margin:0 0 18px;}
-  .split-head{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap;}
-  .split-label{font-family:var(--mono);font-size:12.5px;letter-spacing:.06em;color:var(--text-dim);margin-bottom:7px;}
+  .split-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;
+    padding:20px 22px;margin:0 0 18px;}
+  .split-label{font-family:var(--mono);font-size:12.5px;letter-spacing:.06em;color:var(--text-dim);margin-bottom:8px;}
   .split-period{color:var(--text-faint);}
-  .split-total{font-size:29px;font-weight:700;letter-spacing:-.02em;line-height:1.1;}
-  .split-delta{font-family:var(--mono);font-size:13px;color:var(--text-faint);text-align:right;padding-top:20px;}
+  /* 총액과 증감률을 나란히 — 카드 양 끝으로 벌어지면 두 숫자가 한눈에 안 이어진다 */
+  .split-headline{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:16px;}
+  .split-total{font-size:31px;font-weight:700;letter-spacing:-.02em;line-height:1.1;}
+  .split-delta{font-family:var(--mono);font-size:14px;font-weight:600;}
   .split-delta .up{color:var(--up);} .split-delta .down{color:var(--down);}
-  .split-bar{display:flex;height:12px;border-radius:6px;overflow:hidden;margin:15px 0 12px;background:var(--surface-2);}
-  .split-seg{height:100%;transition:width .25s ease;}
-  .split-seg.seg-ssp{background:var(--c-ssp);}
-  .split-seg.seg-direct{background:var(--c-direct);}
-  .split-legend{display:flex;gap:26px;flex-wrap:wrap;}
-  .sl-item{display:flex;align-items:flex-start;gap:8px;}
-  .sl-dot{width:9px;height:9px;border-radius:50%;margin-top:4px;flex:none;}
-  .sl-top{font-size:14.5px;}
-  .sl-top b{font-weight:600;}
-  .sl-amt{font-family:var(--mono);font-weight:700;margin-left:3px;}
-  .sl-pct{font-family:var(--mono);font-size:13px;color:var(--text-faint);margin-left:3px;}
-  .sl-sub{font-size:12px;color:var(--text-faint);margin-top:2px;}
-  @media (max-width:640px){ .split-legend{gap:14px;} .split-delta{text-align:left;padding-top:0;} }
+  .split-delta .delta-sub{color:var(--text-faint);font-weight:400;font-size:11.5px;margin-left:5px;}
+
+  /* 통합매출의 오퍼월/애드네트워크 카드와 같은 형태로 통일.
+     가로 게이지는 쓰지 않는다 — 채워지는 막대는 '목표 대비 진행률'로 읽혀서
+     '구성 비중'이라는 뜻과 충돌한다. 비중은 % 숫자로 충분히 전달된다. */
+  .split-two{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .split-gcard{background:var(--surface-2);border:1px solid var(--border);border-radius:12px;
+    padding:15px 17px;position:relative;overflow:hidden;}
+  .split-gcard::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;}
+  .split-gcard.is-ssp::before{background:var(--c-ssp);}
+  .split-gcard.is-direct::before{background:var(--c-direct);}
+  .sg-label{font-family:var(--mono);font-size:12px;letter-spacing:.06em;margin-bottom:7px;
+    display:flex;align-items:center;gap:7px;}
+  .split-gcard.is-ssp .sg-label{color:var(--c-ssp);}
+  .split-gcard.is-direct .sg-label{color:var(--c-direct);}
+  .sg-dot{width:9px;height:9px;border-radius:50%;flex:none;}
+  .sg-value{font-size:22px;font-weight:700;letter-spacing:-.01em;}
+  .sg-meta{font-family:var(--mono);font-size:12.5px;color:var(--text-faint);margin-top:6px;
+    display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+  .sg-meta .up{color:var(--up);} .sg-meta .down{color:var(--down);}
+  .sg-meta .is-new{color:var(--up);background:rgba(94,230,164,.12);border-radius:4px;padding:1px 6px;font-size:11.5px;}
+  .sg-note{font-size:11.5px;color:var(--text-faint);margin-top:7px;}
+  @media (max-width:640px){ .split-two{grid-template-columns:1fr;} }
 
   .reconcile-banner{background:rgba(246,120,158,.10);border:1px solid rgba(246,120,158,.45);
     border-radius:10px;padding:11px 15px;font-size:14px;color:var(--text-dim);
@@ -386,31 +397,23 @@
   <div class="reconcile-banner" id="mwReconcile" style="display:none"></div>
 
   <div class="split-card" id="mwaSplit">
-    <div class="split-head">
-      <div>
-        <div class="split-label">정산금액 <span class="split-period" id="splitPeriod">–</span></div>
-        <div class="split-total" id="splitTotal">–</div>
-      </div>
+    <div class="split-label">정산금액 <span class="split-period" id="splitPeriod">–</span></div>
+    <div class="split-headline">
+      <div class="split-total" id="splitTotal">–</div>
       <div class="split-delta" id="splitDelta"></div>
     </div>
-    <div class="split-bar" id="splitBar">
-      <div class="split-seg seg-ssp" id="barSsp"></div>
-      <div class="split-seg seg-direct" id="barDirect"></div>
-    </div>
-    <div class="split-legend">
-      <div class="sl-item">
-        <span class="sl-dot" style="background:var(--c-ssp)"></span>
-        <div>
-          <div class="sl-top"><b>SSP</b> <span class="sl-amt" id="legSsp">–</span> <span class="sl-pct" id="pctSsp"></span></div>
-          <div class="sl-sub">통합매출에 반영</div>
-        </div>
+    <div class="split-two">
+      <div class="split-gcard is-ssp">
+        <div class="sg-label"><span class="sg-dot" style="background:var(--c-ssp)"></span>SSP</div>
+        <div class="sg-value" id="sspVal">–</div>
+        <div class="sg-meta" id="sspMeta"></div>
+        <div class="sg-note">통합매출에 반영</div>
       </div>
-      <div class="sl-item">
-        <span class="sl-dot" style="background:var(--c-direct)"></span>
-        <div>
-          <div class="sl-top"><b>직광고</b> <span class="sl-amt" id="legDirect">–</span> <span class="sl-pct" id="pctDirect"></span></div>
-          <div class="sl-sub">통합매출에서 제외</div>
-        </div>
+      <div class="split-gcard is-direct">
+        <div class="sg-label"><span class="sg-dot" style="background:var(--c-direct)"></span>직광고</div>
+        <div class="sg-value" id="dirVal">–</div>
+        <div class="sg-meta" id="dirMeta"></div>
+        <div class="sg-note">통합매출에서 제외</div>
       </div>
     </div>
   </div>
@@ -837,8 +840,7 @@ function renderTable(){
 }
 
 function renderSummary3(){
-  // Mobwith 전체 정산금액 하나를 크게 보여주고, SSP/직광고 구성은 막대와 비율로 표현한다.
-  // (금액 3개를 나란히 두면 무엇이 무엇의 합인지, 어느 쪽이 큰지 눈으로 바로 안 들어와서)
+  // 총액 하나 + SSP/직광고 카드 두 개. 가로 게이지는 두지 않는다(위 CSS 주석 참고).
   const ssp = aggregate(startIdx, endIdx, 'ssp').revenue;
   const dir = aggregate(startIdx, endIdx, 'direct').revenue;
   const all = aggregate(startIdx, endIdx, 'all').revenue;
@@ -848,31 +850,29 @@ function renderSummary3(){
     `· ${PAYLOAD.dates[startIdx]} ~ ${PAYLOAD.dates[endIdx]} (${n}일)`;
   document.getElementById('splitTotal').textContent = all == null ? '–' : fmtKrwPlain(all);
 
-  const s = ssp || 0, d = dir || 0;
-  // 비율 막대는 음수(정산 차감)를 표현할 수 없으므로 절댓값 기준으로 폭을 잡는다
-  const base = Math.abs(s) + Math.abs(d);
-  const sPct = base ? Math.abs(s) / base * 100 : 0;
-  document.getElementById('barSsp').style.width = sPct + '%';
-  document.getElementById('barDirect').style.width = (base ? 100 - sPct : 0) + '%';
-
-  document.getElementById('legSsp').textContent = ssp == null ? '–' : fmtKrwPlain(ssp);
-  document.getElementById('legDirect').textContent = dir == null ? '–' : fmtKrwPlain(dir);
-  const pct = v => (all && all !== 0) ? `(${(v / all * 100).toFixed(1)}%)` : '';
-  document.getElementById('pctSsp').textContent = ssp == null ? '' : pct(ssp);
-  document.getElementById('pctDirect').textContent = dir == null ? '' : pct(dir);
-
-  // 저번 달 같은 기간과 비교 (예: 9/1~9/7 -> 8/1~8/7). 그 구간에 데이터가 없으면 표시하지 않는다.
-  const delta = document.getElementById('splitDelta');
+  // 저번 달 같은 기간과 비교. 계열마다 따로 구해야 전체 증감률에 가려지지 않는다 —
+  // 예를 들어 직광고가 새로 잡히기 시작하면 전체 증감률이 크게 부풀려지는데,
+  // SSP 자체 증감률을 따로 보여주면 그 착시를 피할 수 있다.
   const pr = prevMonthRange(PAYLOAD.dates[startIdx], PAYLOAD.dates[endIdx], PAYLOAD.dates);
-  delta.innerHTML = '';
-  if (pr && all != null){
-    const prev = aggregate(pr[0], pr[1], 'all').revenue;
-    if (prev != null && prev > 0){
-      const ch = ((all / prev) - 1) * 100;
-      delta.innerHTML = `<span class="${ch>=0?'up':'down'}">${ch>=0?'▲':'▼'} ${Math.abs(ch).toFixed(1)}%</span>`
-        + `<br/>저번 달 같은 기간 대비`;
-    }
+  function deltaOf(key, cur){
+    if (!pr || cur == null) return '';
+    const prev = aggregate(pr[0], pr[1], key).revenue;
+    if (prev == null) return '';
+    if (prev === 0) return cur > 0 ? '<span class="is-new" title="저번 달 같은 기간에는 매출이 없었습니다">신규</span>' : '';
+    if (prev < 0) return '';   // 기준이 음수면 비율이 뒤집혀 무의미
+    const ch = ((cur / prev) - 1) * 100;
+    return `<span class="${ch>=0?'up':'down'}">${ch>=0?'▲':'▼'} ${Math.abs(ch).toFixed(1)}%</span>`;
   }
+
+  const dAll = deltaOf('all', all);
+  document.getElementById('splitDelta').innerHTML =
+    dAll ? dAll + '<span class="delta-sub">저번 달 같은 기간 대비</span>' : '';
+
+  const pct = v => (all && all !== 0 && v != null) ? `비중 ${(v / all * 100).toFixed(1)}%` : '';
+  document.getElementById('sspVal').textContent = ssp == null ? '–' : fmtKrwPlain(ssp);
+  document.getElementById('sspMeta').innerHTML = [pct(ssp), deltaOf('ssp', ssp)].filter(Boolean).join(' ');
+  document.getElementById('dirVal').textContent = dir == null ? '–' : fmtKrwPlain(dir);
+  document.getElementById('dirMeta').innerHTML = [pct(dir), deltaOf('direct', dir)].filter(Boolean).join(' ');
 }
 
 function renderAll(){
