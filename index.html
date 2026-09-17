@@ -596,7 +596,9 @@ function buildDatasets(){
     if (!keys.length) return;
     datasets.push(aggLine(GROUP_LABELS[g] + ' 합계', key, sumOf(keys),
       getVar(g === 'Offerwall' ? '--c-grp-offerwall' : '--c-grp-adnetwork'),
-      {_onCount: keys.length}));
+      // 유형별 선은 점선으로는 눈에 잘 안 띈다는 피드백으로 실선으로 바꾼다.
+      // 업체 선과 굵기를 맞춰 존재감도 같이 준다.
+      {_onCount: keys.length, borderDash: [], borderWidth: 2.4}));
   });
 
   if (seriesVisible[TOTAL_KEY] === true){
@@ -720,7 +722,7 @@ function renderSeriesToggles(datasets){
     if (!keys.length) return;
     typeChips.push({key: GROUP_KEY_PREFIX + g, label: GROUP_LABELS[g] + ' 합계',
                     color: getVar(g === 'Offerwall' ? '--c-grp-offerwall' : '--c-grp-adnetwork'),
-                    data: sumSeries(keys), dashed: true, aggregate: true,
+                    data: sumSeries(keys), aggregate: true,
                     metaText: keys.length + '곳'});
   });
   addSection('types', '유형별', null, typeChips);
@@ -967,12 +969,13 @@ function init(payload){
   sIn.min = dates[0]; sIn.max = dates[dates.length-1];
   eIn.min = dates[0]; eIn.max = dates[dates.length-1];
 
-  // 기본 표시: 오퍼월 합계 + 애드네트워크 합계 두 선만.
-  // 업체 6개를 한꺼번에 그리면 선이 얽혀 읽기 어렵고, 먼저 보고 싶은 건 대개
-  // "두 사업이 각각 어떻게 움직이는가"이기 때문. 개별 업체는 아래에서 켜서 본다.
-  Object.keys(payload.vendors).forEach(k => { seriesVisible[k] = false; });
-  GROUP_ORDER.forEach(g => { seriesVisible[GROUP_KEY_PREFIX + g] = true; });
+  // 기본 표시: 업체 6개 전부.
+  // 유형별(오퍼월/애드네트워크 합계)·전체 합계·선택 합계는 필요할 때 켜서 보는
+  // 보조선이라 기본은 꺼둔다.
+  Object.keys(payload.vendors).forEach(k => { seriesVisible[k] = true; });
+  GROUP_ORDER.forEach(g => { seriesVisible[GROUP_KEY_PREFIX + g] = false; });
   seriesVisible[TOTAL_KEY] = false;
+  seriesVisible[SELECTED_KEY] = false;
 
   // 기본값 = 이번 달(데이터상 최신 날짜 기준)
   applyPreset('mtd');
