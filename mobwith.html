@@ -346,6 +346,45 @@
   .sg-note{font-size:11.5px;color:var(--text-faint);margin-top:7px;}
   @media (max-width:640px){ .split-two{grid-template-columns:1fr;} }
 
+  /* 지면 생애주기 — 시트 기록 기반 상태 표시 */
+  .lc-panel{background:var(--surface);border:1px solid var(--border);border-radius:14px;
+    padding:16px 18px;margin-bottom:18px;}
+  .lc-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;cursor:pointer;}
+  .lc-title{font-family:var(--mono);font-size:12px;letter-spacing:.06em;color:var(--text-dim);
+    text-transform:uppercase;font-weight:700;}
+  .lc-pill{font-family:var(--mono);font-size:11.5px;border-radius:999px;padding:2px 10px;}
+  .lc-pill.alert{background:rgba(246,120,158,.14);color:var(--down);}
+  .lc-pill.info{background:rgba(139,111,255,.14);color:var(--accent);}
+  .lc-pill.ok{background:rgba(94,230,164,.12);color:var(--up);}
+  .lc-toggle{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--text-faint);}
+  .lc-body{margin-top:14px;display:flex;flex-direction:column;gap:8px;}
+  .lc-item{display:grid;grid-template-columns:110px 1fr 120px;gap:12px;align-items:start;
+    padding:10px 12px;background:var(--surface-2);border-radius:10px;
+    border-left:3px solid var(--border);}
+  .lc-item.alert{border-left-color:var(--down);}
+  .lc-item.info{border-left-color:var(--accent);}
+  .lc-kind{font-family:var(--mono);font-size:11px;font-weight:700;}
+  .lc-item.alert .lc-kind{color:var(--down);}
+  .lc-item.info .lc-kind{color:var(--accent);}
+  .lc-name{font-size:13px;color:var(--text);}
+  .lc-detail{font-size:11.5px;color:var(--text-faint);margin-top:3px;line-height:1.6;}
+  .lc-rev{font-family:var(--mono);font-size:12px;text-align:right;color:var(--text-dim);}
+  .lc-rev small{display:block;font-size:10.5px;color:var(--text-faint);}
+  .lc-empty{font-size:12.5px;color:var(--text-faint);padding:4px 2px;}
+  .lc-counts{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;}
+  .lc-count{font-family:var(--mono);font-size:11px;color:var(--text-faint);
+    background:var(--surface-2);border:1px solid var(--border);border-radius:6px;padding:3px 9px;}
+  @media (max-width:720px){ .lc-item{grid-template-columns:1fr;} .lc-rev{text-align:left;} }
+
+  /* 지면명 옆 상태 배지 */
+  .st-badge{display:inline-block;font-family:var(--mono);font-size:11px;
+    border-radius:4px;padding:1px 6px;margin-left:6px;white-space:nowrap;}
+  .st-legacy{background:rgba(251,191,36,.16);color:#fbbf24;}
+  .st-ended{background:rgba(138,135,163,.18);color:var(--text-faint);}
+  .st-planned{background:rgba(56,189,248,.16);color:#38bdf8;}
+  .st-ending{background:rgba(251,191,36,.16);color:#fbbf24;}
+  .st-warn{background:rgba(246,120,158,.16);color:var(--down);}
+
   .reconcile-banner{background:rgba(246,120,158,.10);border:1px solid rgba(246,120,158,.45);
     border-radius:10px;padding:11px 15px;font-size:14px;color:var(--text-dim);
     margin-bottom:18px;line-height:1.8;}
@@ -395,6 +434,7 @@
   <div class="mw-section-sub">기간은 아래 지면별 히트맵과 별개로 선택합니다.</div>
 
   <div class="reconcile-banner" id="mwReconcile" style="display:none"></div>
+  <div class="lc-panel" id="mwLifecycle" style="display:none"></div>
 
   <div class="split-card" id="mwaSplit">
     <div class="split-label">정산금액 <span class="split-period" id="splitPeriod">–</span></div>
@@ -562,6 +602,86 @@ function fmtKrwPlain(v){
   return sign + '₩' + _krwFmt.format(Math.abs(v));
 }
 function fmtKrw(v){ return v == null ? '–' : fmtKrwPlain(v); }
+
+// 상태값 -> 배지. '운영 중'은 기본 상태라 배지를 붙이지 않는다(대부분이 여기 해당).
+function statusBadge(status, lc){
+  if (!status || status === '운영 중') return '';
+  const m = {
+    '구버전 송출 중':      ['구버전',  'st-legacy',
+                           '신규 버전에서는 제거됐지만 구버전에서 아직 송출 중' +
+                           (lc && lc.lastVer ? ' (마지막 버전 ' + lc.lastVer + ')' : '')],
+    '송출 중지 (코드 유지)': ['송출중지','st-ended', '코드는 남아 있고 송출만 중지'],
+    '종료':               ['종료',    'st-ended', '완전 종료'],
+    '종료 예정':           ['종료예정','st-ending','종료가 예정되어 있습니다'],
+    '운영 예정':           ['예정',    'st-planned','아직 송출 시작 전입니다'],
+    '미송출':              ['미송출',  'st-ended', '송출 이력이 없습니다'],
+    '시트 미등록':         ['미등록',  'st-warn',  '생애주기 시트에 없는 지면입니다'],
+  };
+  const hit = m[status] || (status.indexOf('확인 필요') === 0
+    ? ['확인필요', 'st-warn', status] : null);
+  if (!hit) return '';
+  return '<span class="st-badge ' + hit[1] + '" title="' + hit[2] + '">' + hit[0] + '</span>';
+}
+
+// 생애주기 대조 결과 패널. 시트 기록과 실제 매출이 어긋난 곳만 모아 보여준다.
+function renderLifecycle(payload, elId){
+  const el = document.getElementById(elId);
+  if (!el) return;
+  const issues = payload.lifecycleIssues || [];
+  const counts = payload.lifecycleCounts || {};
+
+  if (payload.lifecycleLoaded === false){
+    el.style.display = '';
+    el.innerHTML = '<div class="lc-head"><span class="lc-title">지면 생애주기</span>' +
+      '<span class="lc-pill alert">시트를 읽지 못함</span></div>' +
+      '<div class="lc-empty">생애주기 시트를 불러오지 못했습니다. 시트 이름과 헤더를 확인해주세요.</div>';
+    return;
+  }
+  if (payload.lifecycleLoaded === undefined && !issues.length && !Object.keys(counts).length){
+    el.style.display = 'none';   // 아직 생애주기 데이터가 없는 예전 JSON
+    return;
+  }
+  el.style.display = '';
+
+  const alerts = issues.filter(x => x.level === 'alert');
+  const infos  = issues.filter(x => x.level === 'info');
+  const nf = new Intl.NumberFormat('ko-KR', {maximumFractionDigits:0});
+  const fmt = v => '₩' + nf.format(v || 0);
+
+  const pills = alerts.length
+    ? '<span class="lc-pill alert">확인 필요 ' + alerts.length + '</span>'
+    : '<span class="lc-pill ok">기록과 일치</span>';
+  const infoPill = infos.length ? '<span class="lc-pill info">참고 ' + infos.length + '</span>' : '';
+  const countChips = Object.entries(counts).sort((a,b) => b[1]-a[1])
+    .map(([k,v]) => '<span class="lc-count">' + k + ' ' + v + '</span>').join('');
+
+  const open = el.dataset.open === '1';
+  const rows = [...alerts, ...infos].map(x =>
+    '<div class="lc-item ' + x.level + '">' +
+      '<div class="lc-kind">' + x.kind + '</div>' +
+      '<div><div class="lc-name">' + x.name + '</div>' +
+      '<div class="lc-detail">' + x.detail + '</div></div>' +
+      '<div class="lc-rev">' + fmt(x.recent) + '<small>최근 7일</small></div>' +
+    '</div>').join('');
+
+  el.innerHTML =
+    '<div class="lc-head" data-lc-toggle>' +
+      '<span class="lc-title">지면 생애주기</span>' + pills + infoPill +
+      '<span class="lc-toggle">' + (issues.length ? (open ? '접기 ▲' : '펼치기 ▼') : '') + '</span>' +
+    '</div>' +
+    (issues.length && open ? '<div class="lc-body">' + rows + '</div>' : '') +
+    (issues.length ? '' : '<div class="lc-empty">시트에 적힌 상태와 실제 매출이 모두 일치합니다.</div>') +
+    '<div class="lc-counts">' + countChips + '</div>';
+
+  const head = el.querySelector('[data-lc-toggle]');
+  if (head && issues.length){
+    head.addEventListener('click', function(){
+      el.dataset.open = open ? '0' : '1';
+      renderLifecycle(payload, elId);
+    });
+  }
+}
+
 
 const MobwithA = (function(){
 
@@ -1345,7 +1465,13 @@ function renderHeat(){
         badges += `<span class="at-badge ${cls}">${t}</span>`;
       });
     }
-    if (pl && pl.stopped) badges += `<span class="stop-badge" title="${pl.lastDate} 이후 데이터가 없습니다">중지</span>`;
+    // 상태는 생애주기 시트가 정답. 시트를 못 읽었을 때만 데이터로 추론한 '중지'로 폴백한다.
+    if (pl){
+      const sb = statusBadge(pl.status, pl.lifecycle);
+      if (sb) badges += sb;
+      else if (!pl.status && pl.stopped)
+        badges += `<span class="stop-badge" title="${pl.lastDate} 이후 데이터가 없습니다">중지</span>`;
+    }
     h+=`<tr><td class="name-cell${isOpen?' open':''}" data-id="${r.id}"><span class="arrow">▶</span>${r.name}<span style="color:var(--text-faint);font-size:11.5px">(${r.os})</span>${badges}</td>`;
     METRICS.filter(m=>m.key!=='name').forEach(m=>{
       const v=r[m.key];
@@ -1589,6 +1715,7 @@ function initPage(payload){
   msIn.min = payload.dates[0]; msIn.max = payload.dates[payload.dates.length-1];
   meIn.min = payload.dates[0]; meIn.max = payload.dates[payload.dates.length-1];
   renderAdTypeSeg();
+  renderLifecycle(payload, 'mwLifecycle');
   renderPlacementFilterList();
   openId=null;
   if (modalState) closeModal();
