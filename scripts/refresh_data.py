@@ -183,6 +183,56 @@ def read_sheet_rows_by_cols(sheet_name, cols_map):
     return out
 
 
+def _norm_header(s):
+    """헤더 비교용 정규화. 공백/대소문자/괄호 꼬리표 차이를 무시한다.
+    'Placement iD', 'Placement ID (S)', 's값(Placement ID)' 같은 표기 흔들림과
+    '시작 시점' / '시작시점' 같은 띄어쓰기 차이 때문에 시트 전체를 못 읽는 일을 막는다."""
+    if not isinstance(s, str):
+        return ''
+    s = s.strip().lower()
+    s = re.sub(r'\s+', '', s)
+    s = re.sub(r'\([^)]*\)$', '', s)   # 끝에 붙은 (S), (Platform) 등 제거
+    return s
+
+
+def read_sheet_rows_flex(sheet_name, spec, required=(), fetch_fn=None):
+    """헤더 이름이 조금 달라도 읽어내는 버전.
+
+    spec: {key: [가능한 헤더 후보들]}
+    required: 이 key들이 하나라도 없으면 [] 반환 (상위에서 폴백)
+    없는 선택 컬럼은 값 None으로 채워 넣는다 — 컬럼 하나 빠졌다고 시트 전체를
+    버리지 않기 위해서.
+    """
+    fetch_fn = fetch_fn or fetch_sheet_rows
+    cols, rows = fetch_fn(sheet_name)
+    norm_cols = [_norm_header(c) for c in cols]
+
+    idx = {}
+    for key, candidates in spec.items():
+        found = None
+        for cand in candidates:
+            n = _norm_header(cand)
+            if n in norm_cols:
+                found = norm_cols.index(n)
+                break
+        if found is not None:
+            idx[key] = found
+
+    missing_required = [k for k in required if k not in idx]
+    if missing_required:
+        print('  ! %s: 필수 컬럼을 못 찾음 %s (시트 헤더: %s)'
+              % (sheet_name, missing_required, cols))
+        return []
+
+    out = []
+    for row in rows:
+        vals = [row[i] for i in idx.values() if i < len(row)]
+        if vals and all(v is None for v in vals):
+            continue
+        out.append({k: (row[i] if i < len(row) else None) for k, i in idx.items()})
+    return out
+
+
 def _num_or_none(v):
     v = parse_gviz_value(v)
     if isinstance(v, bool) or not isinstance(v, (int, float)):
@@ -647,6 +697,225 @@ def build_apcorn_ssp_payload(fetch_fn=None, fetch_fx_fn=None):
             'fxAvailable': fx_available, 'generatedAt': now_str()}
 
 
+# ---------------------------------------------------------------------------
+# 지면 생애주기 (앱 출시에 따른 연동/제거 이력)
+# ---------------------------------------------------------------------------
+# 운영자가 직접 관리하는 시트. 매출 데이터만으로는 "매출이 0이다"까지만 알 수 있고
+# 그게 제거된 건지, 송출을 멈춘 건지, 장애인지 구분할 수 없어서 따로 기록한다.
+LIFECYCLE_SHEETS = {
+    'apcorn':  'APCORN_SSP_ID',
+    'mobwith': 'Mobwith_ID',
+}
+LIFECYCLE_SPEC = {
+    'pid':      ['Placement iD', 'Placement ID', 'Placement ID (S)',
+                 's값(Placement ID)', 's값', 'placement_id'],
+    'name':     ['내용', '지면명', '지면명 (Placement Name)'],
+    'os':       ['OS', 'OS (Platform)'],
+    'firstVer': ['최초 연동 버전'],
+    'start':    ['시작 시점', '시작시점'],
+    'ticket':   ['연동 티켓', '연동티켓'],
+    'end':      ['종료 시점', '종료시점'],
+    'lastVer':  ['마지막 버전', '마지막버전'],
+    'reason':   ['종료 사유', '종료사유'],
+    'status':   ['상태'],
+}
+
+ST_LIVE      = '운영 중'
+ST_LEGACY    = '구버전 송출 중'          # 신규 버전에선 빠졌지만 구버전에서 송출 중
+ST_PAUSED    = '송출 중지 (코드 유지)'
+ST_ENDED     = '종료'
+ST_PLANNED   = '운영 예정'
+ST_ENDING    = '종료 예정'
+ST_NEVER     = '미송출'
+ST_CHECK     = '확인 필요: 시작 시점'
+
+
+def _s(v):
+    """셀 값을 비교 가능한 문자열로. 숫자 ID가 10896120.0으로 들어오는 경우도 정리."""
+    v = parse_gviz_value(v)
+    if v is None:
+        return ''
+    if isinstance(v, float) and v.is_integer():
+        return str(int(v))
+    return str(v).strip()
+
+
+def derive_status(start, end, last_ver):
+    """시트의 '상태' 컬럼이 비어 있을 때 쓰는 폴백. 시트 수식과 같은 규칙."""
+    has_start, has_end, has_last = bool(start), bool(end), bool(last_ver)
+    if not has_start and not has_end:
+        return ST_NEVER
+    if not has_start:
+        return ST_CHECK
+    if '예정' in start:
+        return ST_PLANNED
+    if '예정' in end:
+        return ST_ENDING
+    if not has_end and not has_last:
+        return ST_LIVE
+    if not has_end:
+        return ST_LEGACY
+    if not has_last:
+        return ST_PAUSED
+    return ST_ENDED
+
+
+def read_lifecycle(vendor, fetch_fn=None):
+    """지면 생애주기 시트를 {placement_id: {...}}로 읽는다."""
+    sheet = LIFECYCLE_SHEETS[vendor]
+    rows = read_sheet_rows_flex(sheet, LIFECYCLE_SPEC, required=['pid'], fetch_fn=fetch_fn)
+    out = {}
+    for r in rows:
+        pid = _s(r.get('pid'))
+        if not pid:
+            continue
+        start, end, last_ver = _s(r.get('start')), _s(r.get('end')), _s(r.get('lastVer'))
+        status = _s(r.get('status')) or derive_status(start, end, last_ver)
+        out[pid] = {
+            'name': _s(r.get('name')), 'os': _s(r.get('os')),
+            'firstVer': _s(r.get('firstVer')), 'start': start, 'ticket': _s(r.get('ticket')),
+            'end': end, 'lastVer': last_ver, 'reason': _s(r.get('reason')),
+            'status': status,
+        }
+    return out
+
+
+RECENT_DAYS = 7
+
+
+def check_lifecycle(placements, lifecycle, dates, rev_key='revenue'):
+    """시트에 적힌 상태와 실제 매출 데이터가 어긋나는 곳을 찾는다.
+
+    기록만으로는 틀렸는지 알 수 없고, 데이터만으로는 왜 그런지 알 수 없다.
+    둘을 맞대봐야 "내렸다고 적어뒀는데 아직 돈이 들어오는" 경우가 드러난다.
+
+    placements의 각 항목에 lifecycle 정보를 붙이고, 어긋난 목록을 돌려준다.
+    """
+    def rev_of(p, i):
+        if rev_key in p:
+            v = p[rev_key][i]
+            return v if v is not None else 0.0
+        # Mobwith B는 광고유형별로 나뉘어 있어 합쳐서 본다
+        total, seen = 0.0, False
+        for bt in (p.get('byType') or {}).values():
+            v = bt['revenue'][i]
+            if v is not None:
+                total += v; seen = True
+        return total if seen else 0.0
+
+    n = len(dates)
+    lo = max(0, n - RECENT_DAYS)
+    issues = []
+    seen_pids = set()
+
+    for p in placements:
+        pid = _s(p.get('id'))
+        seen_pids.add(pid)
+        lc = lifecycle.get(pid)
+        recent = sum(rev_of(p, i) for i in range(lo, n))
+        total = sum(rev_of(p, i) for i in range(n))
+        label = (lc or {}).get('name') or p.get('name') or pid
+
+        if lc is None:
+            p['lifecycle'] = None
+            p['status'] = '시트 미등록'
+            issues.append({
+                'level': 'alert', 'kind': '시트 미등록', 'id': pid, 'name': label,
+                'detail': '매출 데이터에는 있는데 생애주기 시트에 없습니다. 시트에 행을 추가해주세요.',
+                'recent': round(recent),
+            })
+            continue
+
+        p['lifecycle'] = lc
+        p['status'] = lc['status']
+        st = lc['status']
+
+        if st in (ST_ENDED, ST_PAUSED) and recent > 0:
+            issues.append({
+                'level': 'alert', 'kind': '종료 기록인데 매출 발생', 'id': pid, 'name': label,
+                'detail': '시트에는 "%s"으로 적혀 있는데 최근 %d일 매출이 있습니다. '
+                          '기록이 틀렸거나 실제로 안 내려갔을 수 있어요.' % (st, RECENT_DAYS),
+                'recent': round(recent),
+            })
+        elif st == ST_PLANNED and recent > 0:
+            issues.append({
+                'level': 'alert', 'kind': '예정인데 이미 매출', 'id': pid, 'name': label,
+                'detail': '시작 시점이 예정으로 적혀 있는데 이미 매출이 발생했습니다. '
+                          '시작 시점을 확정값으로 바꿔주세요.',
+                'recent': round(recent),
+            })
+        elif st == ST_NEVER and recent > 0:
+            issues.append({
+                'level': 'alert', 'kind': '미송출인데 매출 발생', 'id': pid, 'name': label,
+                'detail': '송출 이력이 없다고 적혀 있는데 매출이 있습니다.',
+                'recent': round(recent),
+            })
+        elif st == ST_LIVE and recent == 0 and total > 0:
+            issues.append({
+                'level': 'alert', 'kind': '운영 중인데 매출 없음', 'id': pid, 'name': label,
+                'detail': '운영 중으로 적혀 있는데 최근 %d일 매출이 0원입니다. '
+                          '조용히 빠졌거나 송출이 멈췄을 수 있어요.' % RECENT_DAYS,
+                'recent': 0,
+            })
+        elif st == ST_LEGACY:
+            issues.append({
+                'level': 'info', 'kind': '구버전 송출 중', 'id': pid, 'name': label,
+                'detail': '신규 버전에서는 제거됐지만 구버전 사용자에게 아직 송출 중입니다. '
+                          '(마지막 버전 %s)' % (lc.get('lastVer') or '-'),
+                'recent': round(recent),
+            })
+
+    # 시트에는 운영 중인데 매출 데이터에 아예 안 나타나는 지면
+    for pid, lc in lifecycle.items():
+        if pid in seen_pids:
+            continue
+        if lc['status'] in (ST_LIVE, ST_LEGACY):
+            issues.append({
+                'level': 'alert', 'kind': '데이터에 없음', 'id': pid,
+                'name': lc.get('name') or pid,
+                'detail': '시트에는 "%s"인데 매출 데이터에 한 번도 나타나지 않습니다.' % lc['status'],
+                'recent': 0,
+            })
+
+    order = {'alert': 0, 'info': 1}
+    issues.sort(key=lambda x: (order.get(x['level'], 9), -x.get('recent', 0)))
+    return issues
+
+
+def status_counts(placements):
+    c = {}
+    for p in placements:
+        c[p.get('status') or '미상'] = c.get(p.get('status') or '미상', 0) + 1
+    return c
+
+
+def report_lifecycle(sheet_name, lifecycle, payload):
+    """Actions 로그에 생애주기 대조 결과를 찍는다. 화면을 안 봐도 로그만으로
+    무엇이 어긋났는지 알 수 있도록."""
+    if not lifecycle:
+        print('  ! %s 시트를 읽지 못했습니다 — 생애주기 대조를 건너뜁니다.' % sheet_name)
+        return
+    counts = payload.get('lifecycleCounts', {})
+    print('  %s: %d개 지면 기록됨 | %s' % (
+        sheet_name, len(lifecycle),
+        ', '.join('%s %d' % (k, v) for k, v in sorted(counts.items(), key=lambda x: -x[1]))))
+    issues = payload.get('lifecycleIssues', [])
+    alerts = [x for x in issues if x['level'] == 'alert']
+    infos = [x for x in issues if x['level'] == 'info']
+    if alerts:
+        print('  ! 확인이 필요한 지면 %d건' % len(alerts))
+        for x in alerts:
+            print('     [%s] %s (최근 %d일 매출 %s원)' % (
+                x['kind'], x['name'][:45], RECENT_DAYS, format(x.get('recent', 0), ',')))
+    if infos:
+        print('  · 참고 %d건' % len(infos))
+        for x in infos:
+            print('     [%s] %s (최근 %d일 매출 %s원)' % (
+                x['kind'], x['name'][:45], RECENT_DAYS, format(x.get('recent', 0), ',')))
+    if not alerts and not infos:
+        print('  · 기록과 데이터가 모두 일치합니다.')
+
+
 if __name__ == '__main__':
     payload = build_payload()
     with open('data.json', 'w', encoding='utf-8') as f:
@@ -666,11 +935,18 @@ if __name__ == '__main__':
         json.dump(mobwith_a, f, ensure_ascii=False)
     print('wrote mobwith-a.json: %d dates (SSP/직광고/전체)' % len(mobwith_a.get('dates', [])))
 
+    # 지면 생애주기 시트와 대조 — 기록과 실제 매출이 어긋나는 곳 찾기
+    mw_life = read_lifecycle('mobwith')
+    mobwith_b['lifecycleIssues'] = check_lifecycle(
+        mobwith_b.get('placements', []), mw_life, mobwith_b.get('dates', []))
+    mobwith_b['lifecycleCounts'] = status_counts(mobwith_b.get('placements', []))
+    mobwith_b['lifecycleLoaded'] = bool(mw_life)
+
     with open('mobwith-b.json', 'w', encoding='utf-8') as f:
         json.dump(mobwith_b, f, ensure_ascii=False)
-    stopped_n = sum(1 for p in mobwith_b.get('placements', []) if p.get('stopped'))
-    print('wrote mobwith-b.json: %d placements, 광고유형 %s, 중지 %d개' % (
-        len(mobwith_b.get('placements', [])), mobwith_b.get('adTypes', []), stopped_n))
+    print('wrote mobwith-b.json: %d placements, 광고유형 %s' % (
+        len(mobwith_b.get('placements', [])), mobwith_b.get('adTypes', [])))
+    report_lifecycle('Mobwith_ID', mw_life, mobwith_b)
     if issues:
         diffs = [abs(x['diff']) for x in issues]
         print('  ! A/C와 B 합계가 어긋나는 날 %d건 (차이 최소 %.2f원 ~ 최대 %.2f원)' % (
@@ -680,10 +956,13 @@ if __name__ == '__main__':
                 x['date'], x['type'], x['sheet'], x['heatmap'], x['diff']))
 
     apcorn = build_apcorn_ssp_payload()
+    ap_life = read_lifecycle('apcorn')
+    apcorn['lifecycleIssues'] = check_lifecycle(
+        apcorn.get('placements', []), ap_life, apcorn.get('dates', []))
+    apcorn['lifecycleCounts'] = status_counts(apcorn.get('placements', []))
+    apcorn['lifecycleLoaded'] = bool(ap_life)
+
     with open('apcorn-ssp.json', 'w', encoding='utf-8') as f:
         json.dump(apcorn, f, ensure_ascii=False)
-    unmapped_n = len(apcorn.get('unmappedIds', []))
-    print('wrote apcorn-ssp.json: %d placements (%d unmapped)' % (
-        len(apcorn.get('placements', [])), unmapped_n))
-    if unmapped_n:
-        print('  ! 매핑 안 된 placement_id: %s' % ', '.join(apcorn['unmappedIds'][:10]))
+    print('wrote apcorn-ssp.json: %d placements' % len(apcorn.get('placements', [])))
+    report_lifecycle('APCORN_SSP_ID', ap_life, apcorn)
