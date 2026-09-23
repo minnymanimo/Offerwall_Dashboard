@@ -722,7 +722,7 @@ LIFECYCLE_SPEC = {
 
 ST_LIVE      = '운영 중'
 ST_LEGACY    = '구버전 송출 중'          # 신규 버전에선 빠졌지만 구버전에서 송출 중
-ST_PAUSED    = '송출 중지 (코드 유지)'
+ST_PAUSED    = '송출 중지'
 ST_ENDED     = '종료'
 ST_PLANNED   = '운영 예정'
 ST_ENDING    = '종료 예정'
