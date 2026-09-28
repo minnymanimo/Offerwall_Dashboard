@@ -115,6 +115,8 @@
 
   .table-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px;overflow-x:auto;}
   .table-title{font-size:16.5px;font-weight:700;margin-bottom:16px;}
+  .table-title.is-toggle{display:flex;align-items:center;gap:10px;cursor:pointer;margin-bottom:0;}
+  .table-title.is-toggle[aria-expanded="true"]{margin-bottom:16px;}
   table.datatable{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:14.5px;white-space:nowrap;}
   table.datatable th, table.datatable td{padding:11px 14px;text-align:right;border-bottom:1px solid var(--border);}
   table.datatable th:first-child, table.datatable td:first-child{text-align:left;font-weight:600;}
@@ -489,12 +491,14 @@
   <section class="chart-grid" id="mwa-chartGrid"></section>
 
   <section class="table-card">
-    <div class="table-title">일별 데이터</div>
-    <div id="mwa-tableWrap"><table class="datatable" id="mwa-dataTable"></table></div>
+    <div class="table-title is-toggle" id="mwaTableToggle" aria-expanded="false">
+      일별 데이터<span class="lc-toggle" id="mwaTableToggleLabel">펼치기 ▼</span>
+    </div>
+    <div id="mwa-tableWrap" style="display:none"><table class="datatable" id="mwa-dataTable"></table></div>
   </section>
 
   <div class="mw-section-title">Mobwith B · 지면별 현황</div>
-  <div class="mw-section-sub">기간은 위 Mobwith A와 별개로 선택합니다.</div>
+  <div class="mw-section-sub" id="mwbSectionSub">기간은 위 Mobwith A와 별개로 선택합니다.</div>
 
 
   <div class="controls-row">
@@ -911,6 +915,17 @@ function renderCharts(){
 }
 
 let tableSortKey = 'date', tableSortDir = 'asc';
+let mwaTableOpen = false;   // 일별 데이터 표는 기본 접힘 (날짜가 쌓일수록 스크롤이 길어져서)
+
+function applyMwaTableToggle(){
+  const wrap = document.getElementById('mwa-tableWrap');
+  const head = document.getElementById('mwaTableToggle');
+  const label = document.getElementById('mwaTableToggleLabel');
+  if (!wrap || !head || !label) return;
+  wrap.style.display = mwaTableOpen ? '' : 'none';
+  head.setAttribute('aria-expanded', mwaTableOpen ? 'true' : 'false');
+  label.textContent = mwaTableOpen ? '접기 ▲' : '펼치기 ▼';
+}
 
 function renderTable(){
   const dates = PAYLOAD.dates.slice(startIdx, endIdx + 1);
@@ -1017,6 +1032,7 @@ function renderReconcile(payload){
 
 function init(payload){
   PAYLOAD = payload;
+  applyMwaTableToggle();
   renderReconcile(payload);
   if (!payload.dates.length){
     document.getElementById('mwa-kpiGrid').innerHTML =
@@ -1059,6 +1075,10 @@ document.getElementById('mwaSeriesSeg').addEventListener('click', (ev) => {
 });
 document.getElementById('mwa-startInput').addEventListener('change', onDateInputChange);
 document.getElementById('mwa-endInput').addEventListener('change', onDateInputChange);
+document.getElementById('mwaTableToggle').addEventListener('click', () => {
+  mwaTableOpen = !mwaTableOpen;
+  applyMwaTableToggle();
+});
   return { init, reinit };
 })();
 
@@ -1701,6 +1721,13 @@ document.addEventListener('keydown', e=>{ if(e.key==='Escape' && modalState) clo
 
 function initPage(payload){
   DATA = payload;
+  const mwbSub = document.getElementById('mwbSectionSub');
+  if (mwbSub){
+    mwbSub.textContent = (payload.dates && payload.dates.length)
+      ? '기간은 위 Mobwith A와 별개로 선택합니다. (Mobwith B 시트 최신 데이터 기준일: ' +
+        payload.dates[payload.dates.length - 1].replace(/-/g,'.') + ' — "최근 7일" 등은 전부 이 날짜를 기준으로 계산됩니다. Mobwith A/직광고보다 갱신이 늦어질 수 있습니다.)'
+      : '기간은 위 Mobwith A와 별개로 선택합니다.';
+  }
   if (!payload.dates || !payload.dates.length){
     document.getElementById('mwb-heatTable').innerHTML =
       '<tbody><tr><td style="padding:16px;color:var(--text-dim);">표시할 데이터가 없습니다.</td></tr></tbody>';
