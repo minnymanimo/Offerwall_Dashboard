@@ -116,6 +116,26 @@ def parse_gviz_value(v):
     return v
 
 
+def _strip_leading_quote(v):
+    """시트에 숫자를 '텍스트로 강제'하려고 홑따옴표(')를 붙이다가, 그 따옴표가
+    수식 기호가 아니라 실제 문자로 셀에 남아버리는 실수를 방어한다
+    (예: Placement ID가 10896122가 아니라 '10896122 로 들어옴).
+
+    이걸 안 걸러내면:
+      - Mobwith B: id를 int()로 바꾸다 실패해서 그 행 전체가 조용히 빠지고,
+        해당 날짜에 유효한 행이 하나도 없으면 날짜 자체가 통째로 사라진다
+        (그 결과 지면별 히트맵의 '최근'이 실제보다 며칠 뒤처진 것처럼 보인다).
+      - APCORN / 생애주기 시트: id가 매핑 시트의 키와 한 글자 어긋나서
+        엉뚱하게 '미등록' 지면으로 갈라지거나 기록을 못 찾는다.
+    (2026-09-22부터 Mobwith B 시트에서 실제로 발견됨)"""
+    if isinstance(v, str):
+        v = v.strip()
+        while v.startswith("'"):
+            v = v[1:]
+        v = v.strip()
+    return v
+
+
 def normalize_date(v):
     v = parse_gviz_value(v)
     if isinstance(v, date):
@@ -374,7 +394,7 @@ def build_mobwith_b_payload(fetch_fn=None):
     by_id = {}
     for r in rows:
         d = normalize_date(r.get('date'))
-        pid_raw = parse_gviz_value(r.get('id'))
+        pid_raw = _strip_leading_quote(parse_gviz_value(r.get('id')))
         imp = _num_or_none(r.get('impressions'))
         clk = _num_or_none(r.get('clicks'))
         rev = _num_or_none(r.get('revenue'))
@@ -629,7 +649,7 @@ def build_apcorn_ssp_payload(fetch_fn=None, fetch_fx_fn=None):
 
     name_by_pid, os_by_pid = {}, {}
     for r in fetch_fn(APCORN_MAP_SHEET, APCORN_MAP_COLS):
-        pid = r.get('pid')
+        pid = _strip_leading_quote(r.get('pid'))
         pid = str(pid).strip() if pid is not None else ''
         if not pid:
             continue
@@ -644,7 +664,7 @@ def build_apcorn_ssp_payload(fetch_fn=None, fetch_fx_fn=None):
     by_pid = {}
     for r in fetch_fn(APCORN_RAW_SHEET, APCORN_RAW_COLS):
         d = normalize_date(r.get('date'))
-        pid_raw = parse_gviz_value(r.get('pid'))
+        pid_raw = _strip_leading_quote(parse_gviz_value(r.get('pid')))
         if not d or pid_raw is None:
             continue
         pid = str(pid_raw).strip()
@@ -731,8 +751,9 @@ ST_CHECK     = '확인 필요: 시작 시점'
 
 
 def _s(v):
-    """셀 값을 비교 가능한 문자열로. 숫자 ID가 10896120.0으로 들어오는 경우도 정리."""
-    v = parse_gviz_value(v)
+    """셀 값을 비교 가능한 문자열로. 숫자 ID가 10896120.0으로 들어오는 경우와
+    앞에 실수로 붙은 홑따옴표(')도 정리한다 (_strip_leading_quote 참고)."""
+    v = _strip_leading_quote(parse_gviz_value(v))
     if v is None:
         return ''
     if isinstance(v, float) and v.is_integer():
