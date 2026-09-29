@@ -653,6 +653,7 @@ function applyPreset(p){
   document.getElementById('ad-startInput').value = DATA.dates[sI];
   document.getElementById('ad-endInput').value = DATA.dates[eI];
   openId=null; // 기간이 바뀌면 펼쳐둔 일자별 표의 내용도 달라지므로 접는다
+  renderNetSelect();
   renderScatter(); renderHeat();
 }
 
@@ -670,6 +671,7 @@ function onDateInputChange(){
   const ds=periodDates(sI,eI);
   document.getElementById('ad-periodLabel').textContent = `기간: ${ds[0]} ~ ${ds[ds.length-1]} (${ds.length}일)`;
   openId=null;
+  renderNetSelect();
   renderScatter(); renderHeat();
 }
 
@@ -681,6 +683,7 @@ function applyAccHeat(acc){
     const still = aggregate(accHeat).some(r=>r.id===openId);
     if(!still) openId=null;
   }
+  renderNetSelect();
   renderHeat();
 }
 
@@ -690,12 +693,37 @@ function applyAccScatter(acc){
   renderScatter();
 }
 
+// 네트워크 목록은 '지금 보는 기간 + 계정'에 실제 데이터가 있는 것만 고를 수 있게 한다.
+// 전체 기간 중 한때만 잡힌 네트워크(예: 7월에만 있던 Google AdMob)를 최근 7일에서
+// 고르면 표가 텅 비어 '선택지가 없다'처럼 보였기 때문. 그런 네트워크는 목록 아래에
+// '이 기간 데이터 없음'으로 흐리게 남겨 존재는 알 수 있게 한다.
+function netStatsInView(){
+  const src = accHeat === 'all' ? DATA.placements : DATA.placements.filter(p => p.account === accHeat);
+  const st = {};
+  (DATA.networks || []).forEach(n => { st[n] = {rev: 0, has: false}; });
+  src.forEach(p => Object.keys(p.byNet).forEach(n => {
+    const c = p.byNet[n]; if (!st[n]) st[n] = {rev: 0, has: false};
+    for (let i = sI; i <= eI; i++){
+      if (c.impressions[i] != null || c.revenue[i] != null){ st[n].has = true; st[n].rev += c.revenue[i] || 0; }
+    }
+  }));
+  return st;
+}
 function renderNetSelect(){
   const sel = document.getElementById('ad-netSelect');
   const nets = DATA.networks || [];
   if (netFilter !== 'all' && !nets.includes(netFilter)) netFilter = 'all';  // 갱신 후 사라진 네트워크
-  sel.innerHTML = '<option value="all">전체 (' + nets.length + ')</option>' +
-    nets.map(n => `<option value="${n}"${n===netFilter?' selected':''}>${n}</option>`).join('');
+  const st = netStatsInView();
+  const tot = nets.reduce((a, n) => a + (st[n] ? st[n].rev : 0), 0);
+  const live = nets.filter(n => st[n] && st[n].has).sort((a, b) => st[b].rev - st[a].rev);
+  const idle = nets.filter(n => !(st[n] && st[n].has));
+  const esc = t => String(t).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+  const share = n => tot > 0 ? ' · ' + (st[n].rev / tot * 100).toFixed(st[n].rev / tot < 0.01 ? 1 : 0) + '%' : '';
+  sel.innerHTML = '<option value="all">전체 (' + live.length + ')</option>' +
+    live.map(n => `<option value="${esc(n)}">${esc(n)}${share(n)}</option>`).join('') +
+    (idle.length ? '<option disabled>──── 이 기간 데이터 없음 ────</option>' +
+      // 지금 골라둔 네트워크는 기간을 바꿔 데이터가 없어져도 해제되지 않도록 선택 가능하게 둔다
+      idle.map(n => `<option value="${esc(n)}"${n === netFilter ? '' : ' disabled'}>${esc(n)}</option>`).join('') : '');
   sel.value = netFilter;
   sel.classList.toggle('has-filter', netFilter !== 'all');
 }
