@@ -20,6 +20,7 @@
     --c-buzzvil:#4fd1c5;
     --c-apcorn:#f6b860;
     --c-adop:#f6789e;
+    --c-adop-bidmad:#e879f9;
     --c-mobwith-a:#60a5fa;
     --c-adpopcorn-ofw:#a3e635;
     --c-total:#eceaf4;
@@ -45,7 +46,7 @@
   }
   .wrap{max-width:1180px;margin:0 auto;padding:40px 24px 64px;}
 
-  .pagenav{display:flex;gap:6px;margin-bottom:20px;}
+  .pagenav{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:20px;}
   .pagenav a{
     font-family:var(--mono);font-size:13px;color:var(--text-dim);text-decoration:none;
     background:var(--surface);border:1px solid var(--border);border-radius:8px;
@@ -108,7 +109,7 @@
 
   /* ③ 업체별 순위 목록 */
   .sum-list{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:6px 20px 14px;}
-  .sl-head,.sl-row{display:grid;grid-template-columns:230px 1fr 112px 78px;gap:12px;align-items:center;}
+  .sl-head,.sl-row{display:grid;grid-template-columns:290px 1fr 112px 78px;gap:12px;align-items:center;}
   .sl-head{padding:10px 0 6px;font-family:var(--mono);font-size:11.5px;color:var(--text-faint);letter-spacing:.05em;}
   .sl-head div:nth-child(3),.sl-head div:nth-child(4){text-align:right;}
   .sl-row{padding:9px 0;border-bottom:1px solid var(--border);}
@@ -255,6 +256,9 @@
     .sum-two{grid-template-columns:1fr;}
     .sl-head,.sl-row{grid-template-columns:180px 1fr 100px;}
     .sl-head div:nth-child(4),.sl-chg{display:none;}
+    /* 좁은 화면에선 'ADOP(테크랩스 점신/Bidmad)'처럼 긴 이름이 잘려 구분이 안 되므로 줄바꿈 허용 */
+    .sl-vlabel{white-space:normal;line-height:1.35;}
+    .sl-grp{display:none;}  /* 그룹은 위 Offerwall/AdNetwork 카드로 이미 구분됨 — 좁은 화면에선 이름에 자리를 양보 */
     .chart-box{height:320px;}
     .trend-head{flex-direction:column;}
   }
@@ -282,6 +286,7 @@
     <a href="./index.html" class="active">통합 매출</a>
     <a href="./mobwith.html">Mobwith 상세</a>
     <a href="./apcorn.html">APCORN SSP 상세</a>
+    <a href="./adop.html">ADOP 상세</a>
   </nav>
 
   <header>
@@ -348,8 +353,8 @@
     <div class="notes-title">데이터 참고 사항</div>
     <ul>
       <li><b>중복 날짜 자동 정리</b> — 같은 날짜가 여러 행으로 기록된 경우 자동으로 1건으로 정리해 집계합니다.</li>
-      <li><b>매출 컬럼 부재</b> — APCORN_SSP·ADOP 시트는 별도 '매출' 컬럼이 없어 media_cost / mediaRevNo 값을 사용합니다. 매출/비용 여부는 원본 기준 확인이 필요합니다.</li>
-      <li><b>USD→KRW 환산</b> — APCORN_SSP·ADOP는 원본이 USD라, 각 날짜의 Frankfurter(ECB 기준) 당일 환율로 원화 환산해 표시합니다. 주말·공휴일처럼 환율이 발표되지 않는 날은 직전 영업일 환율을 사용합니다. 카드의 작은 글씨가 환산에 쓰인 원본 USD 값과 환율입니다.</li>
+      <li><b>매출 컬럼 부재</b> — APCORN_SSP·ADOP(점신·Bidmad) 시트는 별도 '매출' 컬럼이 없어 media_cost / mediaRevNo 값을 사용합니다. 매출/비용 여부는 원본 기준 확인이 필요합니다.</li>
+      <li><b>USD→KRW 환산</b> — APCORN_SSP·ADOP(점신·Bidmad)는 원본이 USD라, 각 날짜의 Frankfurter(ECB 기준) 당일 환율로 원화 환산해 표시합니다. 주말·공휴일처럼 환율이 발표되지 않는 날은 직전 영업일 환율을 사용합니다. 카드의 작은 글씨가 환산에 쓰인 원본 USD 값과 환율입니다.</li>
       <li><b>벤더 간 규모 차이</b> — NBT 애디슨이 다른 벤더보다 매출 규모가 훨씬 커서, 선형 축에서는 나머지 벤더의 추이가 눌려 보입니다. 작은 벤더의 증감을 볼 때는 <b>로그</b> 축으로 전환하거나 차트 아래 토글에서 NBT·합계를 잠시 꺼 두세요.</li>
       <li><b>합계 선</b> — 현재 켜져 있는 항목만 더한 값입니다. 항목을 끄면 합계도 다시 계산되고, 켜진 항목이 1개 이하일 때는 그 항목과 겹치므로 합계를 표시하지 않습니다.</li>
       <li><b>칩의 합계와 일수</b> — 각 항목 칩에 선택 기간의 합계 금액과, 실제로 데이터가 있는 일수를 함께 표시합니다. 벤더마다 수집 시작일이 달라(예: Mobwith A는 8/1부터) 금액만으로 규모를 비교하면 오해할 수 있기 때문입니다.</li>
@@ -380,6 +385,7 @@ const colorMap = {
   Buzzvil: getVar('--c-buzzvil'),
   APCORN_SSP: getVar('--c-apcorn'),
   ADOP: getVar('--c-adop'),
+  ADOP_Bidmad: getVar('--c-adop-bidmad'),
   'Mobwith A': getVar('--c-mobwith-a'),
   ADPOPCORN_Offerwall: getVar('--c-adpopcorn-ofw'),
 };
