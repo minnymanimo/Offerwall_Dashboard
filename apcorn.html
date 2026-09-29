@@ -39,7 +39,7 @@
   }
   .wrap{max-width:1180px;margin:0 auto;padding:40px 24px 64px;}
 
-  .pagenav{display:flex;gap:6px;margin-bottom:20px;}
+  .pagenav{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:20px;}
   .pagenav a{
     font-family:var(--mono);font-size:13px;color:var(--text-dim);text-decoration:none;
     background:var(--surface);border:1px solid var(--border);border-radius:8px;
@@ -167,7 +167,7 @@
   *{box-sizing:border-box;}
   body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);-webkit-font-smoothing:antialiased;}
   .wrap{max-width:1180px;margin:0 auto;padding:32px 24px 64px;}
-  .pagenav{display:flex;gap:6px;margin-bottom:20px;}
+  .pagenav{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:20px;}
   .pagenav a{
     font-family:var(--mono);font-size:13px;color:var(--text-dim);text-decoration:none;
     background:var(--surface);border:1px solid var(--border);border-radius:8px;
@@ -375,6 +375,7 @@
     <a href="./index.html">통합 매출</a>
     <a href="./mobwith.html">Mobwith 상세</a>
     <a href="./apcorn.html" class="active">APCORN SSP 상세</a>
+    <a href="./adop.html">ADOP 상세</a>
   </nav>
 
   <header>
@@ -1158,7 +1159,7 @@ document.getElementById('ap-modalStartInput').addEventListener('change', onModal
 document.getElementById('ap-modalEndInput').addEventListener('change', onModalDateInputChange);
 document.getElementById('ap-modalClose').addEventListener('click', closeModal);
 document.getElementById('ap-modalBackdrop').addEventListener('click', e=>{
-  if(e.target.id==='modalBackdrop') closeModal();
+  if(e.target.id==='ap-modalBackdrop') closeModal();
 });
 document.addEventListener('keydown', e=>{ if(e.key==='Escape' && modalState) closeModal(); });
 
