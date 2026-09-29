@@ -3,9 +3,11 @@
 오퍼월 광고 매출 대시보드 — 데이터 갱신 스크립트 (GitHub Actions에서 실행)
 
 세 개의 JSON을 만듭니다:
-- data.json      : 벤더 통합 일별 매출 (NBT_Adison, Buzzvil, APCORN_SSP, ADOP, Mobwith_A)
+- data.json      : 벤더 통합 일별 매출 (NBT_Adison, Buzzvil, APCORN_SSP, ADOP 점신, ADOP Bidmad, Mobwith_A, ...)
 - mobwith-a.json  : Mobwith A 일별 상세 지표(노출수/클릭수/CTR/CPC/정산금액/eCPM)
 - mobwith-b.json  : Mobwith B 지면별 스냅샷(노출수/클릭수/CTR/CPC/정산금액/eCPM)
+- apcorn-ssp.json : APCORN SSP 지면별 일별 지표
+- adop.json       : ADOP(테크랩스) 지면별 일별 지표 — 점신(ADOP_raw) + Bidmad(ADOP_Bidmad_raw)
 
 구글시트를 공개 gviz 엔드포인트로 읽어옵니다.
 
@@ -38,7 +40,10 @@ VENDOR_CONFIG = {
     'APCORN_SSP': {'label': 'APCORN SSP', 'date_col': 'date', 'group': 'AdNetwork',
                    'formula': {'type': 'multiply', 'col': 'media_cost', 'factor': 0.8},
                    'unit': 'media_cost × 80%', 'unit_krw': 'media_cost × 80% (원화 환산)', 'currency': 'USD'},
-    'ADOP':       {'label': 'ADOP(테크랩스)', 'date_col': 'date', 'value_col': 'mediaRevNo', 'group': 'AdNetwork',
+    # ADOP는 계정이 둘이다(2026-09~): 기존 계정 = 점신, 새 계정 = Bidmad. 키(=시트 이름)는 그대로 두고 표시명만 구분.
+    'ADOP':       {'label': 'ADOP(테크랩스 점신)', 'date_col': 'date', 'value_col': 'mediaRevNo', 'group': 'AdNetwork',
+                   'unit': 'mediaRevNo', 'unit_krw': 'mediaRevNo (원화 환산)', 'currency': 'USD'},
+    'ADOP_Bidmad': {'label': 'ADOP(테크랩스 Bidmad)', 'date_col': 'date', 'value_col': 'mediaRevNo', 'group': 'AdNetwork',
                    'unit': 'mediaRevNo', 'unit_krw': 'mediaRevNo (원화 환산)', 'currency': 'USD'},
     'Mobwith A':  {'label': 'Mobwith (SSP)', 'date_col': '날 짜', 'value_col': '정산금액', 'group': 'AdNetwork',
                    'unit': '정산금액 (원)', 'currency': 'KRW'},
@@ -97,7 +102,10 @@ def fetch_sheet_rows(sheet_name):
     rows = []
     for r in table.get('rows', []):
         cells = r.get('c') or []
-        row = [(cell.get('v') if cell else None) for cell in cells]
+        # 한 컬럼에 형식이 섞여 있으면(예: 날짜 칸 일부는 날짜, 일부는 20260905 같은 숫자)
+        # gviz가 소수 형식 쪽의 v를 null로 비워 보낼 때가 있다. 그때는 화면 표시값(f)이라도 쓴다.
+        row = [((cell.get('v') if cell.get('v') is not None else cell.get('f')) if cell else None)
+               for cell in cells]
         while len(row) < len(cols):
             row.append(None)
         rows.append(row)
@@ -149,6 +157,8 @@ def normalize_date(v):
         return '%s-%s-%s' % (s[0:4], s[4:6], s[6:8])
     if isinstance(v, str) and v.strip():
         t = v.strip().replace('.', '-').replace('/', '-')
+        if re.fullmatch(r'\d{8}', t):  # '20260926' 형태 (ADOP sdate 등)
+            return '%s-%s-%s' % (t[0:4], t[4:6], t[6:8])
         parts = t.split('-')
         if len(parts) != 3:
             return None
@@ -280,9 +290,13 @@ def read_vendor_series_for_vendor(key, cfg):
     rows = read_sheet_rows_by_cols(key, cols_map)
 
     by_date = {}
+    bad_dates = []
     for r in rows:
         d = normalize_date(r.get('__date__'))
         if not d:
+            # 값은 있는데 날짜를 못 읽은 행 — 날짜 입력 양식이 바뀌었을 때 조용히 빠지지 않게 로그로 남긴다
+            if any(_num_or_none(r.get(c)) is not None for c in needed_cols):
+                bad_dates.append(r.get('__date__'))
             continue
         vals = [_num_or_none(r.get(c)) for c in needed_cols]
         if any(v is None for v in vals):
@@ -291,6 +305,9 @@ def read_vendor_series_for_vendor(key, cfg):
             by_date[d] = vals[0] - vals[1]
         else:  # multiply
             by_date[d] = vals[0] * formula['factor']
+    if bad_dates:
+        print('  ! %s: 날짜를 읽지 못해 빠진 행 %d개 (예: %s) — 날짜 칸 입력 양식을 확인하세요'
+              % (key, len(bad_dates), bad_dates[:3]))
     return by_date
 
 
@@ -937,6 +954,164 @@ def report_lifecycle(sheet_name, lifecycle, payload):
         print('  · 기록과 데이터가 모두 일치합니다.')
 
 
+# ---------------------------------------------------------------------------
+# ADOP(테크랩스) 지면별 상세 — adop.json
+# ---------------------------------------------------------------------------
+# 계정이 둘이다. 원본(raw) 탭은 매체·네트워크·광고단위별로 한 줄씩이고, 요약 탭은 날짜별 합계.
+ADOP_ACCOUNTS = [
+    {'account': '점신',   'raw': 'ADOP_raw',        'summary': 'ADOP'},
+    {'account': 'Bidmad', 'raw': 'ADOP_Bidmad_raw', 'summary': 'ADOP_Bidmad'},
+]
+ADOP_RAW_SPEC = {
+    'date':       ['date'],          # Bidmad raw에만 있음 (스크립트가 넣는 기준일)
+    'sdate':      ['sdate'],
+    'comIdx':     ['comIdx'],
+    'comName':    ['comName'],
+    'netComIdx':  ['netComIdx'],
+    'netComName': ['netComName'],
+    'unitName':   ['unitName'],
+    'pv':         ['pv'],
+    'clk':        ['clk'],
+    'rev':        ['mediaRevNo'],
+    'zoneNo':     ['zoneNo'],
+    'areaIdx':    ['areaIdx'],
+}
+# 요약 탭 합계와 원본 합계가 이 이상(USD) 다르면 경고
+ADOP_RECONCILE_TOL_USD = 0.01
+
+
+def _adop_num(v):
+    """ADOP API는 pv/clk/mediaRevNo를 문자열("1100", "12.00")로 주기도 한다.
+    시트에 문자열로 남아 있어도 숫자로 읽는다. (공용 _num_or_none은 숫자 셀만 받음)"""
+    n = _num_or_none(v)
+    if n is not None:
+        return n
+    v = _strip_leading_quote(parse_gviz_value(v))
+    if isinstance(v, str):
+        try:
+            return float(v.replace(',', '').strip())
+        except ValueError:
+            return None
+    return None
+
+
+def _adop_rows(sheet, fetch_fn=None):
+    """raw 탭을 읽어 (정규화된 행 리스트, 중복으로 버린 행 수)를 돌려준다.
+
+    ADOP_raw는 같은 날짜를 다시 돌리면 행이 그대로 한 번 더 쌓이는 구조(append)라
+    중복이 있을 수 있다. 날짜+매체+네트워크+지면+zone+area가 같으면 같은 행으로 보고
+    마지막 것만 남긴다 — 그대로 더하면 매출이 두 배로 잡힌다."""
+    rows = read_sheet_rows_flex(sheet, ADOP_RAW_SPEC, required=['unitName', 'rev'],
+                                fetch_fn=fetch_fn)
+    uniq = {}
+    for r in rows:
+        d = normalize_date(r.get('date')) or normalize_date(r.get('sdate'))
+        unit = _s(r.get('unitName'))
+        if not d or not unit:
+            continue
+        key = (d, _s(r.get('comIdx')), _s(r.get('netComIdx')), unit,
+               _s(r.get('zoneNo')), _s(r.get('areaIdx')), _s(r.get('netComName')))
+        uniq[key] = {
+            'date': d, 'unit': unit,
+            'media': _s(r.get('comName')),
+            'net': _s(r.get('netComName')) or '(네트워크 미상)',
+            'pv': _adop_num(r.get('pv')) or 0.0,
+            'clk': _adop_num(r.get('clk')) or 0.0,
+            'rev': _adop_num(r.get('rev')) or 0.0,
+        }
+    return list(uniq.values()), len(rows) - len(uniq)
+
+
+def build_adop_payload(fetch_fn=None, fetch_fx_fn=None, summary_fn=None):
+    """ADOP 두 계정의 raw 탭을 합쳐 지면(계정·매체·unitName)별 × 네트워크별 일별 지표를 만든다.
+
+    - 정산금액(mediaRevNo)은 USD라 APCORN과 똑같이 당일 환율로 원화 환산한다.
+    - 네트워크(netComName)는 합쳐버리지 않고 지면 안에 byNet으로 따로 들고 있다가
+      화면에서 네트워크 필터로 골라 볼 수 있게 한다.
+    - 요약 탭(ADOP / ADOP_Bidmad) 날짜별 합계와 raw 합계를 대조해서 어긋난 날을 남긴다."""
+    fetch_fx_fn = fetch_fx_fn or fetch_usd_krw_rates
+    summary_fn = summary_fn or (lambda sheet: read_vendor_series(sheet, 'date', 'mediaRevNo'))
+
+    all_rows, loaded, dup_total = [], {}, 0
+    for src in ADOP_ACCOUNTS:
+        try:
+            rows, dups = _adop_rows(src['raw'], fetch_fn=fetch_fn)
+        except Exception as e:  # 한 계정 탭을 못 읽어도 나머지 계정은 보여준다
+            print('  ! %s 읽기 실패: %s' % (src['raw'], e))
+            rows, dups = [], 0
+        loaded[src['account']] = bool(rows)
+        dup_total += dups
+        for r in rows:
+            r['account'] = src['account']
+        all_rows.extend(rows)
+
+    if not all_rows:
+        return {'dates': [], 'accounts': [a['account'] for a in ADOP_ACCOUNTS], 'networks': [],
+                'placements': [], 'reconcile': [], 'duplicateRows': dup_total,
+                'loaded': loaded, 'fxAvailable': False, 'generatedAt': now_str()}
+
+    dates = build_date_range(min(r['date'] for r in all_rows), max(r['date'] for r in all_rows))
+    raw_rates = fetch_fx_fn(dates[0], dates[-1])
+    fx_available = bool(raw_rates)
+    rate_by_date = fill_rate_series(dates, raw_rates) if fx_available else {}
+    idx = {d: i for i, d in enumerate(dates)}
+    n = len(dates)
+
+    # 지면 = 계정 + 매체(comName) + unitName. 같은 이름이 계정/매체가 달라도 섞이지 않게.
+    by_id, net_rev = {}, {}
+    raw_sum_usd = {}  # (account, date) -> USD 합계 (요약 탭 대조용)
+    for r in all_rows:
+        pid = '%s|%s|%s' % (r['account'], r['media'], r['unit'])
+        p = by_id.setdefault(pid, {'id': pid, 'name': r['unit'], 'media': r['media'],
+                                   'account': r['account'], 'byNet': {}})
+        cell = p['byNet'].setdefault(r['net'], {'impressions': [None] * n,
+                                                 'clicks': [None] * n, 'revenue': [None] * n})
+        i = idx[r['date']]
+        rate = rate_by_date.get(r['date']) if fx_available else 1.0
+        rev = r['rev'] * rate if rate else None
+        for k, v in (('impressions', r['pv']), ('clicks', r['clk']), ('revenue', rev)):
+            if v is None:
+                continue
+            cell[k][i] = (cell[k][i] or 0.0) + v
+        net_rev[r['net']] = net_rev.get(r['net'], 0.0) + (rev or 0.0)
+        k2 = (r['account'], r['date'])
+        raw_sum_usd[k2] = raw_sum_usd.get(k2, 0.0) + r['rev']
+
+    def total_rev(p):
+        return sum(v for c in p['byNet'].values() for v in c['revenue'] if v is not None)
+    placements = sorted(by_id.values(), key=lambda p: -total_rev(p))
+    networks = sorted(net_rev, key=lambda k: -net_rev[k])
+
+    # 요약 탭 vs raw 대조 — raw가 빠졌거나(수집 실패) 중복으로 부풀었으면 여기서 드러난다.
+    reconcile = []
+    for src in ADOP_ACCOUNTS:
+        acc = src['account']
+        if not loaded.get(acc):
+            continue
+        try:
+            summary = summary_fn(src['summary']) or {}
+        except Exception as e:
+            print('  ! %s 요약 탭 읽기 실패: %s' % (src['summary'], e))
+            continue
+        acc_dates = sorted({d for (a, d) in raw_sum_usd if a == acc} | set(summary))
+        for d in acc_dates:
+            if d < dates[0] or d > dates[-1]:
+                continue
+            s_v, r_v = summary.get(d), raw_sum_usd.get((acc, d))
+            if s_v is None and r_v is None:
+                continue
+            if s_v is None or r_v is None or abs(s_v - r_v) > ADOP_RECONCILE_TOL_USD:
+                reconcile.append({'account': acc, 'date': d,
+                                  'summary': None if s_v is None else round(s_v, 2),
+                                  'raw': None if r_v is None else round(r_v, 2),
+                                  'diff': round((r_v or 0) - (s_v or 0), 2)})
+
+    return {'dates': dates, 'accounts': [a['account'] for a in ADOP_ACCOUNTS],
+            'networks': networks, 'placements': placements, 'reconcile': reconcile,
+            'duplicateRows': dup_total, 'loaded': loaded,
+            'fxAvailable': fx_available, 'generatedAt': now_str()}
+
+
 if __name__ == '__main__':
     payload = build_payload()
     with open('data.json', 'w', encoding='utf-8') as f:
@@ -987,3 +1162,18 @@ if __name__ == '__main__':
         json.dump(apcorn, f, ensure_ascii=False)
     print('wrote apcorn-ssp.json: %d placements' % len(apcorn.get('placements', [])))
     report_lifecycle('APCORN_SSP_ID', ap_life, apcorn)
+
+    # ADOP 지면별 상세. 새로 붙인 기능이라 여기서 뭐가 터져도 위의 다른 JSON들은 이미 저장된 상태로 둔다.
+    try:
+        adop = build_adop_payload()
+        with open('adop.json', 'w', encoding='utf-8') as f:
+            json.dump(adop, f, ensure_ascii=False)
+        print('wrote adop.json: %d placements, 네트워크 %d개, 계정 로드 %s' % (
+            len(adop['placements']), len(adop['networks']), adop['loaded']))
+        if adop['duplicateRows']:
+            print('  · raw 중복 행 %d개는 하나로 합쳐서 집계했습니다.' % adop['duplicateRows'])
+        for x in adop['reconcile']:
+            print('  ! ADOP %s %s 요약탭=%s raw합계=%s (USD)' % (
+                x['account'], x['date'], x['summary'], x['raw']))
+    except Exception as e:
+        print('  ! adop.json 생성 실패: %s' % e)
