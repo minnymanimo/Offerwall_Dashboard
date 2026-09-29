@@ -55,23 +55,30 @@
   .pagenav a:hover{color:var(--text);border-color:var(--accent);}
   .pagenav a.active{color:var(--accent);border-color:var(--accent);background:var(--accent-soft);font-weight:700;}
 
+  /* 제목 영역(왼쪽)은 남는 폭을 모두 쓰고 업체 목록은 그 안에서 줄바꿈,
+     원본·생성 시각(오른쪽)은 제 폭만 차지해 오른쪽 위에 고정된다.
+     예전 flex-wrap 방식은 업체가 늘어 제목 줄이 길어지면 오른쪽 블록이
+     아래로 밀려 가운데쯤 오른쪽 정렬로 떠 보였다. */
   header{
-    display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:16px;
+    display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:12px 32px;
     padding-bottom:22px;margin-bottom:28px;border-bottom:1px solid var(--border);
   }
+  .head-meta{display:flex;flex-direction:column;align-items:flex-end;gap:6px;}
   .eyebrow{
     font-family:var(--mono);font-size:12.5px;letter-spacing:0.16em;color:var(--accent);
     text-transform:uppercase;margin-bottom:10px;
   }
   h1{font-size:26px;font-weight:700;margin:0 0 6px;letter-spacing:-0.01em;}
-  .subtitle{font-size:14.5px;color:var(--text-dim);}
+  .subtitle{font-size:14.5px;color:var(--text-dim);line-height:1.6;}
   .subtitle b{color:var(--text);font-weight:600;}
-  .meta-box{font-family:var(--mono);font-size:13px;color:var(--text-dim);text-align:right;line-height:1.7;}
+  .subtitle .period{display:block;margin-top:2px;font-family:var(--mono);font-size:13px;}
+  .subtitle .period b{font-family:var(--sans);font-size:14.5px;}
+  .meta-box{font-family:var(--mono);font-size:13px;color:var(--text-dim);text-align:right;line-height:1.7;white-space:nowrap;}
   .meta-box .pill{
     display:inline-block;padding:2px 8px;border-radius:20px;
     background:var(--accent-soft);color:var(--accent);font-size:12px;margin-left:6px;
   }
-  .refresh-row{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:4px;}
+  .refresh-row{display:flex;align-items:center;justify-content:flex-end;gap:8px;}
   #refreshIndicator{font-size:12px;color:var(--accent);min-width:70px;text-align:right;}
   #refreshBtn{
     font-family:var(--mono);font-size:12px;color:var(--text-dim);
@@ -261,6 +268,10 @@
     .sl-grp{display:none;}  /* 그룹은 위 Offerwall/AdNetwork 카드로 이미 구분됨 — 좁은 화면에선 이름에 자리를 양보 */
     .chart-box{height:320px;}
     .trend-head{flex-direction:column;}
+    header{grid-template-columns:1fr;align-items:start;}
+    .head-meta{align-items:flex-start;}
+    .meta-box{text-align:left;}
+    .refresh-row{justify-content:flex-start;}
   }
   @media (max-width:640px){
     input[type="date"], input[type="text"], .placement-filter-search{ font-size:16px; }
@@ -268,8 +279,7 @@
   @media (max-width:520px){
     .wrap{padding:28px 16px 48px;}
     .sh-value{font-size:30px;}
-    header{align-items:flex-start;}
-    .meta-box{text-align:left;}
+    .meta-box{text-align:left;white-space:normal;}
     .refresh-row{justify-content:flex-start;}
     .chart-box{height:280px;}
     .controls{gap:10px;}
@@ -293,9 +303,10 @@
     <div>
       <div class="eyebrow">Ad Revenue · Vendor Overview</div>
       <h1>광고 매출 대시보드</h1>
-      <div class="subtitle"><span id="vendorList">–</span> &nbsp;|&nbsp; <b id="dateRange">–</b></div>
+      <div class="subtitle"><span id="vendorList">–</span>
+        <span class="period">집계 기간 <b id="dateRange">–</b></span></div>
     </div>
-    <div>
+    <div class="head-meta">
       <div class="meta-box">
         원본: 오퍼월 광고 집계 (Google Sheets)<span class="pill">Live</span><br/>
         생성 시각: <span id="generatedAt">–</span>
@@ -313,7 +324,7 @@
     <div id="fxWarnBanner"></div>
     <div class="trend-head">
       <div>
-        <div class="trend-title">일별 매출 추이</div>
+        <div class="trend-title" id="trendTitle">일별 매출 추이</div>
         <div class="trend-sub" id="trendSub">–</div>
       </div>
       <div class="controls">
@@ -329,6 +340,11 @@
           <input type="date" id="startInput" aria-label="시작일" />
           <span>–</span>
           <input type="date" id="endInput" aria-label="종료일" />
+        </div>
+        <div class="seg" id="granSeg" aria-label="집계 단위">
+          <button data-gran="day" class="active">일봉</button>
+          <button data-gran="week">주봉</button>
+          <button data-gran="month">월봉</button>
         </div>
         <div class="seg" id="scaleSeg">
           <button data-scale="linear" class="active">선형</button>
@@ -395,6 +411,7 @@ let PAYLOAD = null;
 let trendChart = null;
 let startIdx = 0, endIdx = 0;
 let scaleMode = 'linear';
+let granMode = 'day';   // 'day' | 'week' | 'month' — 그래프 집계 단위(칩·KPI 합계는 영향 없음)
 let activePreset = 'all';
 // 5개 계열(4개 벤더 + 합계)의 표시 여부 — 기간/축을 바꿔도 유지됨
 let seriesVisible = {};
@@ -753,13 +770,78 @@ function renderSeriesToggles(datasets){
 }
 
 
+/* ---------- 주봉·월봉 묶기 ----------
+ * 선택 기간의 일별 값을 주(월요일 시작) 또는 월 단위로 더한다.
+ * - 한 묶음 안의 날이 전부 '데이터 없음'이면 합계도 null(0원과 구분).
+ * - 선택 기간이 묶음의 일부만 걸치면(예: 이번 주·이번 달 진행 중, 기간 시작이 월 중간)
+ *   '부분 집계'로 표시한다. 이 점과 이어지는 선은 점선, 툴팁엔 몇 일치인지 적는다.
+ *   그렇지 않으면 진행 중인 달이 '매출 급감'처럼 보인다. */
+const WD_MS = 86400000;
+function isoDay(d){ return new Date(d + 'T00:00:00Z'); }
+function fmtIso(t){ return new Date(t).toISOString().slice(0, 10); }
+function bucketOf(d, gran){
+  if (gran === 'month'){
+    const [y, m] = d.split('-').map(Number);
+    const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
+    return {key: d.slice(0, 7), from: d.slice(0, 7) + '-01', to: d.slice(0, 7) + '-' + String(last).padStart(2, '0'), full: last};
+  }
+  const t = isoDay(d).getTime();
+  const mon = t - ((isoDay(d).getUTCDay() + 6) % 7) * WD_MS;   // 월요일
+  return {key: fmtIso(mon), from: fmtIso(mon), to: fmtIso(mon + 6 * WD_MS), full: 7};
+}
+function rollup(labels, datasets, gran){
+  if (gran === 'day'){
+    return {labels, ticks: labels.map(shortDate), titles: labels.slice(), partial: labels.map(() => false), datasets};
+  }
+  const buckets = [];   // {key, from, to, full, idx:[...]}
+  labels.forEach((d, i) => {
+    const b = bucketOf(d, gran);
+    const last = buckets[buckets.length - 1];
+    if (last && last.key === b.key) last.idx.push(i); else buckets.push(Object.assign(b, {idx: [i]}));
+  });
+  const multiYear = buckets.length && buckets[0].key.slice(0, 4) !== buckets[buckets.length - 1].key.slice(0, 4);
+  const partial = buckets.map(b => b.idx.length < b.full);
+  const ticks = buckets.map(b => gran === 'month'
+    ? (multiYear ? b.key.slice(2).replace('-', '.') : Number(b.key.slice(5)) + '월')
+    : shortDate(b.from) + '~');
+  const titles = buckets.map((b, j) => {
+    const s = labels[b.idx[0]], e = labels[b.idx[b.idx.length - 1]];
+    const head = gran === 'month' ? `${b.key.slice(0, 4)}년 ${Number(b.key.slice(5))}월` : `${b.from} ~ ${b.to} 주`;
+    return partial[j] ? `${head} · 부분 집계 ${b.idx.length}/${b.full}일 (${shortDate(s)}~${shortDate(e)})` : `${head} · ${b.full}일`;
+  });
+  const sumIdx = (arr, idx) => {
+    if (!arr) return null;
+    let s = null;
+    idx.forEach(i => { const v = arr[i]; if (v !== null && v !== undefined) s = (s === null ? 0 : s) + v; });
+    return s;
+  };
+  const out = datasets.map(ds => Object.assign({}, ds, {
+    data: buckets.map(b => sumIdx(ds.data, b.idx)),
+    _usd: ds._usd ? buckets.map(b => sumIdx(ds._usd, b.idx)) : null,
+    pointRadius: buckets.length <= 40 ? 3 : 0,
+    // 부분 집계 점이 끼어 있는 구간은 점선
+    segment: {borderDash: ctx => (partial[ctx.p0DataIndex] || partial[ctx.p1DataIndex]) ? [4, 4] : undefined},
+    pointStyle: buckets.map((_, j) => partial[j] ? 'rectRot' : 'circle'),
+  }));
+  return {labels: buckets.map(b => b.key), ticks, titles, partial, datasets: out};
+}
+const GRAN_LABEL = {day: '일별', week: '주별', month: '월별'};
+
 function renderTrend(){
  try {
   const {dates} = PAYLOAD;
-  const {labels, datasets, excluded} = buildDatasets();
+  const built = buildDatasets();
+  const dayLabels = built.labels, excluded = built.excluded;
+  const R = rollup(dayLabels, built.datasets, granMode);
+  const labels = R.labels, datasets = R.datasets;
 
+  document.getElementById('trendTitle').textContent = GRAN_LABEL[granMode] + ' 매출 추이';
+  const nPartial = R.partial.filter(Boolean).length;
   document.getElementById('trendSub').textContent =
-    `${labels[0]} – ${labels[labels.length-1]} · ${labels.length}일 · 원(KRW) 기준`;
+    `${dayLabels[0]} – ${dayLabels[dayLabels.length-1]} · ${dayLabels.length}일` +
+    (granMode === 'day' ? '' : ` · ${labels.length}${granMode === 'week' ? '주' : '개월'} (${granMode === 'week' ? '월~일' : '1일~말일'} 합계)`) +
+    (nPartial ? ` · ◇ 점선 = 기간이 일부만 걸친 부분 집계` : '') +
+    ' · 원(KRW) 기준';
 
   document.getElementById('scaleHint').textContent =
     scaleMode === 'logarithmic' ? '로그 축: 증감률 비교에 적합' : '선형 축: 절대 규모 비교에 적합';
@@ -794,7 +876,7 @@ function renderTrend(){
 
   trendChart = new Chart(ctx, {
     type: 'line',
-    data: {labels: labels.map(shortDate), datasets},
+    data: {labels: R.ticks, datasets},
     options: {
       responsive: true,
       maintainAspectRatio: false,
@@ -809,7 +891,7 @@ function renderTrend(){
           bodyFont: {family:"'JetBrains Mono',monospace", size:12.5},
           padding: 11,
           callbacks: {
-            title: (items) => labels[items[0].dataIndex],
+            title: (items) => R.titles[items[0].dataIndex],
             label: (item) => {
               if (item.parsed.y === null) return `${item.dataset.label}: 데이터 없음`;
               let s = `${item.dataset.label}: ₩${fmt(item.parsed.y)}`;
@@ -1030,6 +1112,22 @@ document.getElementById('presetSeg').addEventListener('click', (ev) => {
   const btn = ev.target.closest('button');
   if (!btn) return;
   applyPreset(btn.dataset.preset);
+});
+
+document.getElementById('granSeg').addEventListener('click', (ev) => {
+  const btn = ev.target.closest('button');
+  if (!btn) return;
+  granMode = btn.dataset.gran;
+  document.querySelectorAll('#granSeg button').forEach(b => {
+    b.classList.toggle('active', b.dataset.gran === granMode);
+  });
+  // '이번 달'에서 월봉을 누르면 점 하나뿐이라 추이를 볼 수 없다.
+  // 묶음이 3개 미만이면 기간을 '전체'로 넓혀준다(기간 버튼 강조도 같이 바뀜).
+  if (granMode !== 'day'){
+    const keys = new Set(PAYLOAD.dates.slice(startIdx, endIdx + 1).map(d => bucketOf(d, granMode).key));
+    if (keys.size < 3){ applyPreset('all'); return; }
+  }
+  renderTrend();
 });
 
 document.getElementById('scaleSeg').addEventListener('click', (ev) => {
