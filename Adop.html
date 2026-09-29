@@ -1,0 +1,1268 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<base target="_top">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ADOP 지면별 현황</title>
+<script src="./vendor/chart.umd.min.js"></script>
+<style>
+
+
+  :root{
+    --bg:#0b0b11;
+    --surface:#15151f;
+    --surface-2:#1b1b28;
+    --border:#282836;
+    --text:#eceaf4;
+    --text-dim:#a4a1b5;
+    --text-faint:#8a87a3;
+    --accent:#8b6fff;
+    --accent-soft:rgba(139,111,255,0.14);
+    --c-metric:#60a5fa;
+    --up:#5ee6a4;
+    --down:#f6789e;
+    --mono:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Cascadia Mono','Liberation Mono',monospace;
+    --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Pretendard,Roboto,'Helvetica Neue',Arial,'Apple SD Gothic Neo','Malgun Gothic','Noto Sans KR',sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+
+  /* 표·차트의 숫자가 자리수마다 폭이 달라 세로로 안 맞는 걸 방지 */
+  body{font-variant-numeric:tabular-nums;font-feature-settings:'tnum' 1;}
+    margin:0;
+    background:
+      radial-gradient(ellipse 900px 500px at 15% -10%, rgba(139,111,255,0.10), transparent 60%),
+      var(--bg);
+    color:var(--text);
+    font-family:var(--sans);
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1180px;margin:0 auto;padding:40px 24px 64px;}
+
+  .pagenav{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:20px;}
+  .pagenav a{
+    font-family:var(--mono);font-size:13px;color:var(--text-dim);text-decoration:none;
+    background:var(--surface);border:1px solid var(--border);border-radius:8px;
+    padding:7px 14px;transition:border-color .12s ease, color .12s ease;
+  }
+  .pagenav a:hover{color:var(--text);border-color:var(--accent);}
+  .pagenav a.active{color:var(--accent);border-color:var(--accent);background:var(--accent-soft);font-weight:700;}
+
+  header{
+    display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:16px;
+    padding-bottom:22px;margin-bottom:24px;border-bottom:1px solid var(--border);
+  }
+  .eyebrow{
+    font-family:var(--mono);font-size:12.5px;letter-spacing:0.16em;color:var(--accent);
+    text-transform:uppercase;margin-bottom:10px;
+  }
+  h1{font-size:26px;font-weight:700;margin:0 0 6px;letter-spacing:-0.01em;}
+  .subtitle{font-size:14.5px;color:var(--text-dim);}
+  .subtitle b{color:var(--text);font-weight:600;}
+  .meta-box{font-family:var(--mono);font-size:13px;color:var(--text-dim);text-align:right;line-height:1.7;}
+  .meta-box .pill{
+    display:inline-block;padding:2px 8px;border-radius:20px;
+    background:var(--accent-soft);color:var(--accent);font-size:12px;margin-left:6px;
+  }
+  .refresh-row{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:4px;}
+  #ad-refreshIndicator{font-size:12px;color:var(--accent);min-width:70px;text-align:right;}
+  #ad-refreshBtn{
+    font-family:var(--mono);font-size:12px;color:var(--text-dim);
+    background:var(--surface);border:1px solid var(--border);border-radius:6px;
+    padding:3px 9px;cursor:pointer;
+  }
+  #ad-refreshBtn:hover{color:var(--text);border-color:var(--accent);}
+
+  .controls-row{
+    display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px;
+    margin-bottom:22px;
+  }
+  .controls{display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+  .seg{display:flex;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+  .seg button{
+    font-family:var(--mono);font-size:12.5px;color:var(--text-dim);
+    background:transparent;border:0;padding:6px 12px;cursor:pointer;border-right:1px solid var(--border);
+  }
+  .seg button:last-child{border-right:0;}
+  .seg button:hover{color:var(--text);}
+  .seg button.active{background:var(--accent-soft);color:var(--accent);font-weight:700;}
+  .seg button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px;}
+  .date-range{display:flex;align-items:center;gap:6px;}
+  .date-range input[type="date"]{
+    font-family:var(--mono);font-size:12.5px;color:var(--text);
+    background:var(--surface-2);border:1px solid var(--border);border-radius:7px;
+    padding:5px 8px;color-scheme:dark;cursor:pointer;
+  }
+  .date-range input:focus-visible{outline:2px solid var(--accent);outline-offset:-1px;}
+  .date-range span{font-family:var(--mono);font-size:12.5px;color:var(--text-faint);}
+  .period-label{font-family:var(--mono);font-size:12px;color:var(--text-faint);}
+
+  .kpi-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:28px;}
+  .kpi-card{
+    background:var(--surface);border:1px solid var(--border);border-radius:14px;
+    padding:16px;position:relative;overflow:hidden;
+  }
+  .kpi-card::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;background:var(--c-metric);}
+  .kpi-label{font-size:13px;color:var(--text-dim);font-weight:600;margin-bottom:10px;}
+  .kpi-value{font-family:var(--mono);font-size:19px;font-weight:700;letter-spacing:-0.02em;}
+  .kpi-unit{font-size:11.5px;color:var(--text-faint);margin-top:3px;}
+
+  .chart-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:28px;}
+  .chart-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px 16px 8px;}
+  .chart-title{font-size:14px;font-weight:700;margin-bottom:8px;}
+  .chart-box{height:150px;position:relative;}
+  
+  .table-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px;overflow-x:auto;}
+  .table-title{font-size:16.5px;font-weight:700;margin-bottom:16px;}
+  table.datatable{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:14.5px;white-space:nowrap;}
+  table.datatable th, table.datatable td{padding:11px 14px;text-align:right;border-bottom:1px solid var(--border);}
+  table.datatable th:first-child, table.datatable td:first-child{text-align:left;font-weight:600;}
+  table.datatable th{color:var(--text-dim);font-weight:700;font-size:13px;letter-spacing:.02em;
+    position:sticky;top:0;background:var(--surface);padding-bottom:13px;border-bottom:2px solid var(--border);
+    cursor:pointer;user-select:none;}
+  table.datatable th:hover{color:var(--text);}
+  table.datatable th.sorted{color:var(--accent);}
+  table.datatable tbody tr:nth-child(even){background:rgba(255,255,255,0.015);}
+  table.datatable tbody tr:hover{background:var(--accent-soft);}
+  table.datatable tbody tr.latest-row td{color:var(--text);font-weight:700;}
+  table.datatable tbody tr.latest-row{background:rgba(139,111,255,0.06);}
+  table.datatable .latest-tag{font-size:11.5px;font-weight:400;color:var(--accent);}
+  table.datatable td.na{color:var(--text-faint);}
+  .kpi-delta{font-family:var(--mono);font-size:12.5px;margin-top:8px;display:flex;align-items:center;gap:5px;color:var(--text-dim);}
+  .kpi-delta .arrow-up{color:var(--up);}
+  .kpi-delta .arrow-down{color:var(--down);}
+
+  .chart-error-box{
+    text-align:center;padding:24px;color:var(--down);font-size:14.5px;line-height:1.6;
+    background:var(--surface-2);border:1px dashed rgba(246,120,158,0.35);border-radius:10px;
+  }
+
+  @media (max-width:960px){
+    .kpi-grid{grid-template-columns:repeat(3,1fr);}
+    .chart-grid{grid-template-columns:1fr 1fr;}
+  }
+  @media (max-width:640px){
+    input[type="date"], input[type="text"], .placement-filter-search{ font-size:16px; }
+  }
+  @media (max-width:640px){
+    .wrap{padding:28px 16px 48px;}
+    .kpi-grid{grid-template-columns:1fr 1fr;}
+    .chart-grid{grid-template-columns:1fr;}
+    header{align-items:flex-start;}
+    .meta-box{text-align:left;}
+    .refresh-row{justify-content:flex-start;}
+  }
+
+
+  /* ---- Mobwith B 전용 ---- */
+
+  :root{
+    --bg:#0b0b11; --surface:#15151f; --surface-2:#1b1b28; --border:#282836;
+    --text:#eceaf4; --text-dim:#a4a1b5; --text-faint:#8a87a3;
+    --accent:#8b6fff; --accent-soft:rgba(139,111,255,0.14); --c-metric:#60a5fa;
+    --up:#5ee6a4; --down:#f6789e;
+    --mono:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Cascadia Mono','Liberation Mono',monospace;
+    --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Pretendard,Roboto,'Helvetica Neue',Arial,'Apple SD Gothic Neo','Malgun Gothic','Noto Sans KR',sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);-webkit-font-smoothing:antialiased;}
+  .wrap{max-width:1180px;margin:0 auto;padding:32px 24px 64px;}
+  .pagenav{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:20px;}
+  .pagenav a{
+    font-family:var(--mono);font-size:13px;color:var(--text-dim);text-decoration:none;
+    background:var(--surface);border:1px solid var(--border);border-radius:8px;
+    padding:7px 14px;transition:border-color .12s ease, color .12s ease;
+  }
+  .pagenav a:hover{color:var(--text);border-color:var(--accent);}
+  .pagenav a.active{color:var(--accent);border-color:var(--accent);background:var(--accent-soft);font-weight:700;}
+
+  header{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:16px;
+    padding-bottom:20px;margin-bottom:22px;border-bottom:1px solid var(--border);}
+  .eyebrow{font-family:var(--mono);font-size:12.5px;letter-spacing:.16em;color:var(--accent);text-transform:uppercase;margin-bottom:9px;}
+  h1{font-size:24px;font-weight:700;margin:0 0 6px;letter-spacing:-.01em;}
+  .subtitle{font-size:14px;color:var(--text-dim);}
+  .meta-box{font-family:var(--mono);font-size:13px;color:var(--text-dim);text-align:right;line-height:1.7;}
+  .meta-box .pill{
+    display:inline-block;padding:2px 8px;border-radius:20px;
+    background:var(--accent-soft);color:var(--accent);font-size:12px;margin-left:6px;
+  }
+  .refresh-row{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:4px;}
+  #ad-refreshIndicator{font-size:12px;color:var(--accent);min-width:70px;text-align:right;}
+  #ad-refreshBtn{
+    font-family:var(--mono);font-size:12px;color:var(--text-dim);
+    background:var(--surface);border:1px solid var(--border);border-radius:6px;
+    padding:3px 9px;cursor:pointer;
+  }
+  #ad-refreshBtn:hover{color:var(--text);border-color:var(--accent);}
+
+  .controls-row{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px;}
+  .seg{display:inline-flex;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+  .seg button{font-family:var(--mono);font-size:12.5px;color:var(--text-dim);background:transparent;border:0;
+    padding:6px 12px;cursor:pointer;border-right:1px solid var(--border);}
+  .seg button:last-child{border-right:0;}
+  .seg button.active{background:var(--accent-soft);color:var(--accent);font-weight:700;}
+  .period-label{font-family:var(--mono);font-size:12px;color:var(--text-faint);}
+
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:20px;}
+  .card-title{font-size:15.5px;font-weight:700;margin-bottom:4px;}
+  .card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap;margin-bottom:10px;}
+  .filter-tag{
+    font-family:var(--mono);font-size:12px;color:var(--text-dim);
+    background:var(--surface-2);border:1px solid var(--border);border-radius:999px;padding:4px 11px;flex:none;
+  }
+  .scatter-note{font-size:12.5px;color:var(--text-faint);margin-top:10px;line-height:1.6;}
+  .card-sub{font-size:13px;color:var(--text-faint);margin-bottom:14px;line-height:1.6;}
+  .legend-row{display:flex;gap:14px;flex-wrap:wrap;font-family:var(--mono);font-size:12px;color:var(--text-dim);}
+  .legend-row span{display:inline-flex;align-items:center;gap:5px;}
+  .legend-row i{width:9px;height:9px;border-radius:50%;display:inline-block;}
+  .chart-box{height:380px;position:relative;margin-top:10px;}
+
+  table.heat{width:100%;border-collapse:separate;border-spacing:2px;font-family:var(--mono);font-size:13px;}
+  table.heat th,table.heat td{padding:8px 10px;text-align:center;}
+  table.heat th{color:var(--text-dim);font-weight:600;font-size:12px;cursor:pointer;white-space:nowrap;}
+  table.heat th:hover{color:var(--text);}
+  table.heat th.sorted{color:var(--accent);}
+  table.heat th:first-child,table.heat td.name-cell{text-align:left;white-space:normal;}
+  table.heat td{border-radius:4px;}
+  .name-cell{font-family:var(--sans) !important;font-size:13.5px;color:var(--text);cursor:pointer;
+    display:flex;align-items:center;gap:6px;background:transparent !important;}
+  .name-cell .arrow{font-size:10.5px;color:var(--text-faint);transition:transform .12s ease;}
+  .name-cell.open .arrow{transform:rotate(90deg);color:var(--accent);}
+  .name-cell:hover{color:var(--accent);}
+  .heat-legend{display:flex;align-items:center;gap:8px;margin-top:14px;font-size:12px;color:var(--text-faint);}
+  .ramp{width:110px;height:8px;border-radius:4px;background:linear-gradient(90deg,#1b1b28,#60a5fa);}
+
+  .drill-row td{padding:0;border-radius:0;}
+  .drill-box{background:var(--surface-2);border-top:1px solid var(--border);border-bottom:1px solid var(--border);
+    padding:16px 20px;}
+  .drill-title{font-size:13.5px;font-weight:700;margin-bottom:10px;color:var(--text-dim);}
+  table.daily{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12.5px;}
+  table.daily th,table.daily td{padding:6px 10px;text-align:right;border-bottom:1px solid var(--border);}
+  table.daily th:first-child,table.daily td:first-child{text-align:left;}
+  table.daily th{color:var(--text-faint);font-weight:600;}
+  table.daily td.na{color:var(--text-faint);}
+
+  @media (max-width:640px){
+    .wrap{padding:24px 16px 48px;}
+    header{align-items:flex-start;}
+    .meta-box{text-align:left;}
+    .refresh-row{justify-content:flex-start;}
+  }
+
+  .modal-backdrop{
+    display:none;position:fixed;inset:0;background:rgba(5,5,9,0.7);
+    align-items:center;justify-content:center;z-index:50;padding:20px;
+  }
+  .modal-backdrop.open{display:flex;}
+  .modal-card{
+    background:var(--surface);border:1px solid var(--border);border-radius:14px;
+    padding:22px;width:100%;max-width:640px;max-height:85vh;overflow-y:auto;
+  }
+  .modal-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:16px;}
+  .modal-controls-row{display:flex;align-items:center;flex-wrap:wrap;gap:10px;}
+
+  .placement-filter{position:relative;}
+  .placement-filter-btn{
+    font-family:var(--mono);font-size:12.5px;color:var(--text-dim);
+    background:var(--surface-2);border:1px solid var(--border);border-radius:8px;
+    padding:6px 12px;cursor:pointer;
+  }
+  .placement-filter-btn:hover{color:var(--text);border-color:var(--accent);}
+  .placement-filter-btn.has-filter{color:var(--accent);border-color:var(--accent);}
+  .placement-filter-dropdown{
+    display:none;position:absolute;top:calc(100% + 6px);left:0;z-index:40;
+    background:var(--surface);border:1px solid var(--border);border-radius:10px;
+    padding:10px;width:280px;box-shadow:0 8px 24px rgba(0,0,0,0.4);
+  }
+  .placement-filter-dropdown.open{display:block;}
+  .placement-filter-search{
+    width:100%;box-sizing:border-box;margin-bottom:8px;
+    font-family:var(--sans);font-size:13.5px;color:var(--text);
+    background:var(--surface-2);border:1px solid var(--border);border-radius:7px;padding:6px 10px;
+  }
+  .placement-filter-search:focus{outline:none;border-color:var(--accent);}
+  .placement-filter-search::placeholder{color:var(--text-faint);}
+  .placement-filter-empty{font-size:13px;color:var(--text-faint);padding:10px 4px;text-align:center;}
+  .placement-filter-actions{display:flex;gap:8px;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid var(--border);}
+  .placement-filter-actions button{
+    font-family:var(--mono);font-size:12px;color:var(--text-dim);background:var(--surface-2);
+    border:1px solid var(--border);border-radius:6px;padding:4px 9px;cursor:pointer;
+  }
+  .placement-filter-actions button:hover{color:var(--text);border-color:var(--accent);}
+  .placement-filter-list{max-height:260px;overflow-y:auto;}
+  .placement-filter-item{display:flex;align-items:center;gap:8px;padding:5px 4px;font-size:13.5px;color:var(--text);cursor:pointer;border-radius:5px;}
+  .placement-filter-item:hover{background:var(--surface-2);}
+  .placement-filter-item input{flex:none;accent-color:var(--accent);cursor:pointer;}
+  .placement-filter-item span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .modal-title{font-size:16.5px;font-weight:700;}
+  .modal-sub{font-size:13px;color:var(--text-faint);font-family:var(--mono);margin-top:3px;}
+  .modal-close{
+    background:var(--surface-2);border:1px solid var(--border);border-radius:8px;
+    color:var(--text-dim);width:28px;height:28px;cursor:pointer;font-size:14.5px;flex:none;
+  }
+  .modal-close:hover{color:var(--text);border-color:var(--accent);}
+  #ad-modalChartBox{height:260px;margin-top:16px;}
+  table.heat td.clickable{cursor:pointer;}
+  .chg{font-weight:700;}
+  .chg.chg-up{color:var(--up);}
+  .chg.chg-down{color:var(--down);}
+  .chg.chg-flat{color:var(--text-faint);}
+  .chg-na{color:var(--text-faint);}
+  table.heat td.chg-cell{background:var(--surface-2);}
+  table.heat td.clickable:hover{outline:1px solid var(--accent);outline-offset:-1px;}
+
+  .mw-section-title{font-size:18px;font-weight:700;margin:36px 0 16px;padding-top:4px;}
+  .mw-section-title:first-of-type{margin-top:0;}
+  .mw-section-sub{font-size:13.5px;color:var(--text-faint);margin:-12px 0 18px;line-height:1.6;}
+
+
+  /* 지면 생애주기 — 시트 기록 기반 상태 표시 */
+  .lc-panel{background:var(--surface);border:1px solid var(--border);border-radius:14px;
+    padding:16px 18px;margin-bottom:18px;}
+  .lc-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;cursor:pointer;}
+  .lc-title{font-family:var(--mono);font-size:12px;letter-spacing:.06em;color:var(--text-dim);
+    text-transform:uppercase;font-weight:700;}
+  .lc-pill{font-family:var(--mono);font-size:11.5px;border-radius:999px;padding:2px 10px;}
+  .lc-pill.alert{background:rgba(246,120,158,.14);color:var(--down);}
+  .lc-pill.info{background:rgba(139,111,255,.14);color:var(--accent);}
+  .lc-pill.ok{background:rgba(94,230,164,.12);color:var(--up);}
+  .lc-toggle{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--text-faint);}
+  .lc-body{margin-top:14px;display:flex;flex-direction:column;gap:8px;}
+  .lc-item{display:grid;grid-template-columns:110px 1fr 120px;gap:12px;align-items:start;
+    padding:10px 12px;background:var(--surface-2);border-radius:10px;
+    border-left:3px solid var(--border);}
+  .lc-item.alert{border-left-color:var(--down);}
+  .lc-item.info{border-left-color:var(--accent);}
+  .lc-kind{font-family:var(--mono);font-size:11px;font-weight:700;}
+  .lc-item.alert .lc-kind{color:var(--down);}
+  .lc-item.info .lc-kind{color:var(--accent);}
+  .lc-name{font-size:13px;color:var(--text);}
+  .lc-detail{font-size:11.5px;color:var(--text-faint);margin-top:3px;line-height:1.6;}
+  .lc-rev{font-family:var(--mono);font-size:12px;text-align:right;color:var(--text-dim);}
+  .lc-rev small{display:block;font-size:10.5px;color:var(--text-faint);}
+  .lc-empty{font-size:12.5px;color:var(--text-faint);padding:4px 2px;}
+  .lc-counts{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;}
+  .lc-count{font-family:var(--mono);font-size:11px;color:var(--text-faint);
+    background:var(--surface-2);border:1px solid var(--border);border-radius:6px;padding:3px 9px;}
+  @media (max-width:720px){ .lc-item{grid-template-columns:1fr;} .lc-rev{text-align:left;} }
+
+  /* 지면명 옆 상태 배지 */
+  .st-badge{display:inline-block;font-family:var(--mono);font-size:11px;
+    border-radius:4px;padding:1px 6px;margin-left:6px;white-space:nowrap;}
+  .st-legacy{background:rgba(251,191,36,.16);color:#fbbf24;}
+  .st-ended{background:rgba(138,135,163,.18);color:var(--text-faint);}
+  .st-planned{background:rgba(56,189,248,.16);color:#38bdf8;}
+  .st-ending{background:rgba(251,191,36,.16);color:#fbbf24;}
+  .st-warn{background:rgba(246,120,158,.16);color:var(--down);}
+
+  .unmapped-banner{background:rgba(246,120,158,.10);border:1px solid rgba(246,120,158,.45);
+    border-radius:10px;padding:11px 15px;font-size:14px;color:var(--text-dim);
+    margin-bottom:18px;line-height:1.75;}
+  .unmapped-banner b{color:var(--down);}
+  .unmapped-name{color:var(--text-faint);}
+  .unmapped-ids{font-family:var(--mono);font-size:12.5px;color:var(--text-faint);}
+  .fx-warn{background:rgba(246,120,158,.10);border:1px solid rgba(246,120,158,.45);
+    border-radius:10px;padding:11px 15px;font-size:14px;color:var(--down);
+    margin-bottom:18px;}
+  table.heat td.unmapped-cell{color:var(--text-faint);}
+  .net-filter{display:flex;align-items:center;gap:8px;}
+  .net-filter label{font-family:var(--mono);font-size:12.5px;color:var(--text-faint);}
+  .net-filter select{
+    font-family:var(--mono);font-size:12.5px;color:var(--text-dim);
+    background:var(--surface-2);border:1px solid var(--border);border-radius:8px;
+    padding:6px 10px;cursor:pointer;max-width:220px;
+  }
+  .net-filter select:hover,.net-filter select:focus{color:var(--text);border-color:var(--accent);outline:none;}
+  .net-filter select.has-filter{color:var(--accent);border-color:var(--accent);}
+  .net-badge{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:999px;
+    font-family:var(--mono);font-size:11px;line-height:1.6;color:var(--text-dim);
+    background:var(--surface-2);border:1px solid var(--border);vertical-align:1px;white-space:nowrap;}
+  .nm{min-width:0;}
+  .nm-line{display:flex;flex-wrap:wrap;align-items:center;row-gap:3px;}
+  .acc-tag{color:var(--text-faint);font-size:11.5px;margin-top:2px;}
+  table.heat td.name-cell{min-width:230px;}
+  /* 표가 화면보다 넓으면 페이지 전체가 아니라 카드 안에서만 가로 스크롤 */
+  .heat-card{overflow-x:auto;}
+  .data-note{font-size:13px;color:var(--text-faint);margin:-8px 0 18px;}
+  .rc-list{font-family:var(--mono);font-size:12.5px;color:var(--text-faint);}
+
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <nav class="pagenav">
+    <a href="./index.html">통합 매출</a>
+    <a href="./mobwith.html">Mobwith 상세</a>
+    <a href="./apcorn.html">APCORN SSP 상세</a>
+    <a href="./adop.html" class="active">ADOP 상세</a>
+  </nav>
+
+  <header>
+    <div>
+      <div class="eyebrow">ADOP · Techlabs · Placement</div>
+      <h1>ADOP 지면별 현황</h1>
+      <div class="subtitle">점신 · Bidmad 두 계정의 지면(unitName) 단위 일별 지표 &nbsp;|&nbsp; <b id="ad-dateRange">–</b></div>
+    </div>
+    <div>
+      <div class="meta-box">
+        원본: ADOP_raw + ADOP_Bidmad_raw<span class="pill">Live</span><br/>
+        생성 시각: <span id="ad-generatedAt">–</span>
+      </div>
+      <div class="refresh-row">
+        <span id="ad-refreshIndicator"></span>
+        <button id="ad-refreshBtn">지금 새로고침</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="fx-warn" id="ad-fxWarn" style="display:none">
+    ⚠ 환율 조회에 실패해 매출이 원화로 환산되지 않았습니다 (USD 원본 표시).
+  </div>
+  <div class="fx-warn" id="ad-loadWarn" style="display:none"></div>
+  <div class="unmapped-banner" id="ad-reconcileBanner" style="display:none"></div>
+  <div class="data-note" id="ad-dupNote" style="display:none"></div>
+
+
+  
+
+
+  <div class="controls-row">
+    <div class="period-label" id="ad-periodLabel">기간: –</div>
+    <div class="seg" id="ad-presetSeg">
+      <button data-p="1">최근 1일</button>
+      <button data-p="7" class="active">7일</button>
+      <button data-p="all">전체</button>
+    </div>
+    <div class="date-range">
+      <input type="date" id="ad-startInput" aria-label="시작일" />
+      <span>–</span>
+      <input type="date" id="ad-endInput" aria-label="종료일" />
+    </div>
+    <div class="placement-filter">
+      <button type="button" id="ad-placementFilterBtn" class="placement-filter-btn">
+        지면 선택 <span id="ad-placementFilterCount">(전체)</span>
+      </button>
+      <div class="placement-filter-dropdown" id="ad-placementFilterDropdown">
+        <input type="text" class="placement-filter-search" id="ad-placementSearch"
+               placeholder="지면 이름 검색" autocomplete="off" />
+        <div class="placement-filter-actions">
+          <button type="button" id="ad-placementSelectAll">전체 선택</button>
+          <button type="button" id="ad-placementSelectNone">전체 해제</button>
+        </div>
+        <div class="placement-filter-list" id="ad-placementFilterList"></div>
+        <div class="placement-filter-empty" id="ad-placementNoMatch" style="display:none">검색 결과가 없습니다.</div>
+      </div>
+    </div>
+    <div class="net-filter">
+      <label for="ad-netSelect">네트워크</label>
+      <select id="ad-netSelect"><option value="all">전체</option></select>
+    </div>
+  </div>
+
+  <section class="card heat-card">
+    <div class="card-head">
+      <div>
+        <div class="card-title">지면별 지표 히트맵</div>
+        <div class="card-sub">색은 <b style="color:var(--text-dim)">현재 필터·기간 안에서의</b> 순위(백분위)입니다. <b style="color:var(--text-dim)">지면명을 클릭하면</b> 일자별 표가 펼쳐지고, 지면명 옆 작은 태그는 매출이 난 네트워크(상위 2개)입니다. <b style="color:var(--text-dim)">숫자를 클릭하면</b> 그 지표의 일별 추이가 팝업으로 뜹니다.</div>
+      </div>
+      <div class="seg" id="ad-accSegHeat">
+        <button data-acc="all" class="active">전체</button>
+        <button data-acc="점신">점신</button>
+        <button data-acc="Bidmad">Bidmad</button>
+      </div>
+    </div>
+    <table class="heat" id="ad-heatTable"></table>
+    <div class="heat-legend">낮음<span class="ramp"></span>높음 (해당 지표 1위)</div>
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <div class="card-title">규모 × 효율 분포</div>
+      <div class="seg" id="ad-accSegScatter">
+        <button data-acc="all" class="active">전체</button>
+        <button data-acc="점신">점신</button>
+        <button data-acc="Bidmad">Bidmad</button>
+      </div>
+    </div>
+    <div class="legend-row">
+      <span><i style="background:#5ee6a4"></i>규모·효율 모두 우수</span>
+      <span><i style="background:#f6b860"></i>규모 크나 효율 낮음</span>
+      <span><i style="background:#60a5fa"></i>효율 좋으나 규모 작음</span>
+      <span><i style="background:#6b6980"></i>둘 다 낮음</span>
+    </div>
+    <div class="chart-box"><canvas id="ad-scatterCanvas"></canvas></div>
+    <div class="scatter-note" id="ad-scatterNote"></div>
+  </section>
+
+  <div class="modal-backdrop" id="ad-modalBackdrop">
+    <div class="modal-card">
+      <div class="modal-head">
+        <div>
+          <div class="modal-title" id="ad-modalTitle">–</div>
+          <div class="modal-sub" id="ad-modalSub">–</div>
+        </div>
+        <button class="modal-close" id="ad-modalClose" aria-label="닫기">✕</button>
+      </div>
+      <div class="modal-controls-row">
+        <div class="seg" id="ad-modalPresetSeg">
+          <button data-p="1">최근 1일</button>
+          <button data-p="7">7일</button>
+          <button data-p="14">14일</button>
+          <button data-p="all">전체</button>
+        </div>
+        <div class="date-range">
+          <input type="date" id="ad-modalStartInput" aria-label="시작일" />
+          <span>–</span>
+          <input type="date" id="ad-modalEndInput" aria-label="종료일" />
+        </div>
+      </div>
+      <div class="chart-box" id="ad-modalChartBox"><canvas id="ad-modalCanvas"></canvas></div>
+    </div>
+  </div>
+
+
+</div>
+
+<script>
+// 음수 KRW 값을 "-₩1,234"로 표기(부호가 화폐기호 뒤로 가는 걸 방지).
+// 반올림해서 0이 되는 값은 "-₩0"이 되지 않도록 부호를 뗀다.
+const _krwFmt = new Intl.NumberFormat('ko-KR', {maximumFractionDigits:0});
+function fmtKrwPlain(v){
+  const roundedAbs = Math.round(Math.abs(v));
+  const sign = (v < 0 && roundedAbs !== 0) ? '-' : '';
+  return sign + '₩' + _krwFmt.format(Math.abs(v));
+}
+function fmtKrw(v){ return v == null ? '–' : fmtKrwPlain(v); }
+
+// 환율 조회에 실패하면 매출이 USD 원본으로 들어온다 — 그때는 $로 표기해 원화로 오해하지 않게 한다.
+let MONEY_IS_USD = false;
+const _usdFmt = new Intl.NumberFormat('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+function fmtMoneyPlain(v){
+  if (!MONEY_IS_USD) return fmtKrwPlain(v);
+  const sign = (v < 0 && Math.abs(v) >= 0.005) ? '-' : '';
+  return sign + '$' + _usdFmt.format(Math.abs(v));
+}
+function fmtMoney(v){ return v == null ? '–' : fmtMoneyPlain(v); }
+
+const AdopDetail = (function(){
+
+
+let DATA = null;
+const f0 = new Intl.NumberFormat('ko-KR',{maximumFractionDigits:0});
+const f2 = new Intl.NumberFormat('ko-KR',{maximumFractionDigits:2});
+const METRICS = [
+  {key:'impressions',label:'노출수',fmt:v=>v==null?'–':f0.format(v)},
+  {key:'clicks',label:'클릭수',fmt:v=>v==null?'–':f0.format(v)},
+  {key:'ctr',label:'CTR',fmt:v=>v==null?'–':f2.format(v*100)+'%'},
+  {key:'cpc',label:'CPC',fmt:v=>fmtMoney(v)},
+  {key:'revenue',label:'정산금액',fmt:v=>fmtMoney(v)},
+  {key:'revenueChange',label:'변화율',fmt:v=>fmtChange(v),isChange:true},
+  {key:'revShare',label:'매출비중',fmt:v=>v==null?'–':f2.format(v*100)+'%'},
+  {key:'ecpm',label:'eCPM',fmt:v=>fmtMoney(v)},
+  {key:'ecpmChange',label:'변화율',fmt:v=>fmtChange(v),isChange:true},
+];
+// 변화율 표기 — 미미한 변동(±3% 미만)은 회색으로 눌러서 시각적 노이즈를 줄인다.
+// null은 비교할 직전 7일이 없는 경우(데이터 14일 미만).
+function fmtChange(v){
+  // 'new' = 직전 7일 매출이 0이었는데 최근 7일에 매출이 생긴 경우.
+  // 증가율이 무한대라 %로 못 쓰므로 '신규'로 표기한다.
+  if (v === 'new') return '<span class="chg chg-up" title="직전 7일 매출이 0원이라 증가율을 계산할 수 없습니다">신규</span>';
+  if (v == null) return '<span class="chg-na" title="직전 7일 매출이 0 이하라 비율 비교가 불가능합니다">–</span>';
+  const cls = Math.abs(v) < 3 ? 'chg-flat' : (v > 0 ? 'chg-up' : 'chg-down');
+  return `<span class="chg ${cls}">${v > 0 ? '+' : ''}${v.toFixed(1)}%</span>`;
+}
+// 팝업 그래프 대상 지표만 (매출비중은 현재 필터 안에서의 상대값이라 일별로 쪼개면
+// 의미가 달라지므로 팝업 그래프 대상에서 제외. 변화율도 파생값이라 제외)
+const CHARTABLE = ['impressions','clicks','ctr','cpc','revenue','ecpm'];
+function getVar(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+
+let sI=0, eI=0, activePreset='7';
+let sortKey='revenue', sortDir='desc';
+// 히트맵과 분포도는 서로 다른 용도로 쓰이므로 계정(점신/Bidmad) 필터를 각각 독립적으로 둔다.
+let accHeat='all', accScatter='all';
+// 네트워크(netComName) 필터 — 히트맵·분포도·일자별 표·팝업에 모두 공유로 적용된다.
+let netFilter='all';
+
+// 지면 p의 i번째 날짜 값을 현재 네트워크 필터 기준으로 합산해 돌려준다.
+// 고른 네트워크들이 그날 전부 결측이면 null(공백)을 유지한다 — 0원과 '데이터 없음'을 구분하기 위해.
+function cellOf(p, i){
+  const nets = netFilter === 'all' ? Object.keys(p.byNet) : [netFilter];
+  let imp=0, clk=0, rev=0, any=false;
+  nets.forEach(n => {
+    const c = p.byNet[n];
+    if (!c || c.impressions[i] == null) return;
+    imp += c.impressions[i] || 0; clk += c.clicks[i] || 0; rev += c.revenue[i] || 0; any = true;
+  });
+  return any ? {imp, clk, rev} : null;
+}
+// 지면에서 매출이 난 네트워크를 매출순으로 (전체 네트워크 보기에서 태그로 표시)
+function netsByRevenue(p){
+  return Object.keys(p.byNet).map(n => [n, p.byNet[n].revenue.reduce((s,v)=>s+(v||0),0)])
+    .filter(x => x[1] > 0).sort((a,b) => b[1]-a[1]).map(x => x[0]);
+}
+// 지면 선택 필터는 반대로 히트맵·분포도 양쪽에 공유로 적용한다(사용자 요청).
+// null = 전체 지면 표시, Set이면 그 안의 id만 표시.
+let placementFilter = null;
+// 이미 한 번이라도 목록에 나타났던 지면 id — 갱신 때 '새로 생긴 지면'을 구분하는 데 쓴다.
+let knownPlacementIds = new Set();
+let openId=null; // 지면명 클릭 시 펼쳐진 일자별 표의 대상 (한 번에 하나만)
+let scatterChart=null, modalChart=null;
+let modalState=null; // {placementId, metricKey, sI, eI}
+
+function periodDates(rangeS, rangeE){ return DATA.dates.slice(rangeS,rangeE+1); }
+
+// 선택 기간 + 주어진 계정 필터 + 네트워크 필터 + 공유 지면 필터 기준 지면별 집계
+// (비율 지표는 합산 후 도출 — 일별 비율의 단순평균이 아님)
+function aggregate(accFilter){
+  let src = accFilter==='all' ? DATA.placements : DATA.placements.filter(p=>p.account===accFilter);
+  if (netFilter !== 'all') src = src.filter(p => p.byNet[netFilter]);  // 그 네트워크가 없는 지면은 목록에서 뺀다
+  if (placementFilter) src = src.filter(p => placementFilter.has(p.id));
+  const rows = src.map(p=>{
+    let imp=0,clk=0,rev=0,any=false;
+    for(let i=sI;i<=eI;i++){
+      const c=cellOf(p,i);
+      if(c){imp+=c.imp;clk+=c.clk;rev+=c.rev;any=true;}
+    }
+    return {id:p.id,name:p.name,account:p.account,media:p.media,
+      impressions:any?imp:null, clicks:any?clk:null, revenue:any?rev:null,
+      ctr:imp?clk/imp:null, cpc:clk?rev/clk:null, ecpm:imp?rev/imp*1000:null};
+  });
+  // 매출비중은 "현재 보이는 지면들" 안에서의 비중 — Bidmad만 필터하면
+  // Bidmad 지면들끼리의 비중으로 다시 계산된다.
+  const tot = rows.reduce((s,r)=>s+(r.revenue||0),0);
+  rows.forEach(r=>{
+    r.revShare = tot?( (r.revenue||0)/tot ):null;
+    // 변화율은 선택 기간과 무관하게 항상 최근 14일 기준(위 computeChangeRates 참고)
+    const p = DATA.placements.find(x => x.id === r.id);
+    const ch = p ? computeChangeRates(p) : {revenueChange:null, ecpmChange:null};
+    r.revenueChange = ch.revenueChange;
+    r.ecpmChange = ch.ecpmChange;
+  });
+  return rows;
+}
+
+function applyPreset(p){
+  activePreset=p;
+  const n=DATA.dates.length;
+  eI=n-1; sI=(p==='all') ? 0 : Math.max(0, n-parseInt(p,10));
+  document.querySelectorAll('#ad-presetSeg button').forEach(b=>b.classList.toggle('active', b.dataset.p===p));
+  const ds=periodDates(sI,eI);
+  document.getElementById('ad-periodLabel').textContent = `기간: ${ds[0]} ~ ${ds[ds.length-1]} (${ds.length}일)`;
+  document.getElementById('ad-startInput').value = DATA.dates[sI];
+  document.getElementById('ad-endInput').value = DATA.dates[eI];
+  openId=null; // 기간이 바뀌면 펼쳐둔 일자별 표의 내용도 달라지므로 접는다
+  renderScatter(); renderHeat();
+}
+
+function onDateInputChange(){
+  const dates = DATA.dates;
+  const sVal = document.getElementById('ad-startInput').value;
+  const eVal = document.getElementById('ad-endInput').value;
+  let s = 0;
+  if (sVal){ s = dates.findIndex(d => d >= sVal); if (s === -1) s = dates.length - 1; }
+  let e = dates.length - 1;
+  if (eVal){ e = -1; for (let i = dates.length-1;i>=0;i--){ if (dates[i] <= eVal){ e=i; break; } } if (e===-1) e=0; }
+  if (s > e){ const t=s; s=e; e=t; }
+  sI = s; eI = e; activePreset = null;
+  document.querySelectorAll('#ad-presetSeg button').forEach(b=>b.classList.toggle('active', false));
+  const ds=periodDates(sI,eI);
+  document.getElementById('ad-periodLabel').textContent = `기간: ${ds[0]} ~ ${ds[ds.length-1]} (${ds.length}일)`;
+  openId=null;
+  renderScatter(); renderHeat();
+}
+
+function applyAccHeat(acc){
+  accHeat=acc;
+  document.querySelectorAll('#ad-accSegHeat button').forEach(b=>b.classList.toggle('active', b.dataset.acc===acc));
+  // 필터를 바꾸면 펼쳐둔 지면이 목록에서 사라질 수 있으므로 접는다
+  if(openId!=null){
+    const still = aggregate(accHeat).some(r=>r.id===openId);
+    if(!still) openId=null;
+  }
+  renderHeat();
+}
+
+function applyAccScatter(acc){
+  accScatter=acc;
+  document.querySelectorAll('#ad-accSegScatter button').forEach(b=>b.classList.toggle('active', b.dataset.acc===acc));
+  renderScatter();
+}
+
+function renderNetSelect(){
+  const sel = document.getElementById('ad-netSelect');
+  const nets = DATA.networks || [];
+  if (netFilter !== 'all' && !nets.includes(netFilter)) netFilter = 'all';  // 갱신 후 사라진 네트워크
+  sel.innerHTML = '<option value="all">전체 (' + nets.length + ')</option>' +
+    nets.map(n => `<option value="${n}"${n===netFilter?' selected':''}>${n}</option>`).join('');
+  sel.value = netFilter;
+  sel.classList.toggle('has-filter', netFilter !== 'all');
+}
+
+function applyNetFilter(n){
+  netFilter = n;
+  document.getElementById('ad-netSelect').classList.toggle('has-filter', n !== 'all');
+  if(openId!=null && !aggregate(accHeat).some(r=>r.id===openId)) openId=null;
+  if(modalState) closeModal();
+  renderScatter(); renderHeat();
+}
+
+/* ---------- 지면 선택 필터 (히트맵 + 분포도 공유) ---------- */
+function renderPlacementFilterList(){
+  // 갱신 시 새로 생긴 지면은 사용자가 선택/해제한 적이 없으므로 기본적으로 '보이도록'
+  // 필터에 추가한다. 그러지 않으면 새 지면이 조용히 숨겨져 매출을 놓칠 수 있다.
+  if (placementFilter){
+    DATA.placements.forEach(p => {
+      if (!knownPlacementIds.has(p.id)) placementFilter.add(p.id);
+    });
+  }
+  DATA.placements.forEach(p => knownPlacementIds.add(p.id));
+
+  const box = document.getElementById('ad-placementFilterList');
+  const q = (document.getElementById('ad-placementSearch').value || '').trim().toLowerCase();
+
+  // 가나다순 정렬 — 매출순으로 두면 갱신될 때마다 순서가 바뀌어 원하는 지면을 찾기 어렵다.
+  const sorted = [...DATA.placements].sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+  const shown = q ? sorted.filter(p => p.name.toLowerCase().includes(q)) : sorted;
+
+  box.innerHTML = shown.map(p => {
+    const checked = !placementFilter || placementFilter.has(p.id);
+    const shortName = p.name.replace(/^티머니GO_/, '');
+    return `<label class="placement-filter-item">
+      <input type="checkbox" data-id="${p.id}" ${checked?'checked':''}>
+      <span title="${p.name}">${shortName} (${p.account})</span>
+    </label>`;
+  }).join('');
+  document.getElementById('ad-placementNoMatch').style.display = shown.length ? 'none' : '';
+  updatePlacementFilterCount();
+}
+
+function updatePlacementFilterCount(){
+  const btn = document.getElementById('ad-placementFilterBtn');
+  const countEl = document.getElementById('ad-placementFilterCount');
+  if (!placementFilter || placementFilter.size === DATA.placements.length){
+    countEl.textContent = '(전체)';
+    btn.classList.remove('has-filter');
+  } else {
+    countEl.textContent = `(${placementFilter.size}/${DATA.placements.length})`;
+    btn.classList.add('has-filter');
+  }
+}
+
+// 검색으로 목록이 걸러져 있으면 '화면에 보이는 체크박스'만 훑어서는 안 된다 —
+// 검색어에 안 걸린 지면이 조용히 필터에서 빠져버린다.
+function currentSelection(){
+  if (placementFilter) return new Set(placementFilter);
+  return new Set(DATA.placements.map(p => p.id));
+}
+function commitSelection(sel){
+  placementFilter = (sel.size === DATA.placements.length) ? null : sel;
+  updatePlacementFilterCount();
+  if(openId!=null && placementFilter && !placementFilter.has(openId)) openId=null;
+  renderScatter(); renderHeat();
+}
+function applyPlacementFilterChange(ev){
+  const cb = ev && ev.target && ev.target.matches('input[type="checkbox"]') ? ev.target : null;
+  if (!cb) return;
+  const id = cb.dataset.id;   // ADOP 지면 ID는 '계정|매체|지면명' 문자열
+  const sel = currentSelection();
+  if (cb.checked) sel.add(id); else sel.delete(id);
+  commitSelection(sel);
+}
+function setShownPlacements(checked){
+  const ids = [...document.querySelectorAll('#ad-placementFilterList input[type="checkbox"]')]
+    .map(b => b.dataset.id);
+  const sel = currentSelection();
+  ids.forEach(id => { if (checked) sel.add(id); else sel.delete(id); });
+  commitSelection(sel);
+  renderPlacementFilterList();
+}
+
+document.getElementById('ad-placementFilterBtn').addEventListener('click', (e)=>{
+  e.stopPropagation();
+  document.getElementById('ad-placementFilterDropdown').classList.toggle('open');
+});
+document.getElementById('ad-placementFilterList').addEventListener('change', applyPlacementFilterChange);
+document.getElementById('ad-placementSelectAll').addEventListener('click', ()=> setShownPlacements(true));
+document.getElementById('ad-placementSelectNone').addEventListener('click', ()=> setShownPlacements(false));
+document.getElementById('ad-placementSearch').addEventListener('input', renderPlacementFilterList);
+document.getElementById('ad-placementSearch').addEventListener('click', e=> e.stopPropagation());
+document.addEventListener('click', (e)=>{
+  const dd = document.getElementById('ad-placementFilterDropdown');
+  const btn = document.getElementById('ad-placementFilterBtn');
+  if (dd.classList.contains('open') && !dd.contains(e.target) && e.target!==btn) dd.classList.remove('open');
+});
+
+function ensureScatterCanvas(){
+  const el = document.getElementById('ad-scatterCanvas');
+  if (el && el.tagName !== 'CANVAS'){
+    el.outerHTML = '<canvas id="ad-scatterCanvas"></canvas>';
+  }
+}
+
+function renderScatter(){
+  // 데이터 없음/오류로 이전에 캔버스 자리가 <div>로 바뀌어 있을 수 있으므로,
+  // 그릴 데이터가 있을 가능성에 대비해 항상 먼저 진짜 <canvas>로 되돌려놓는다.
+  ensureScatterCanvas();
+  const all=aggregate(accScatter);
+  // 로그 축은 0 이하를 표현할 수 없어 Chart.js가 해당 점을 조용히 빼버린다.
+  // 사용자가 모르게 지면이 사라지지 않도록 직접 걸러내고 몇 개가 빠졌는지 표시한다.
+  const rows=all.filter(r=>r.impressions!=null && r.impressions>0 && r.ecpm!=null);
+  const excluded=all.length-rows.length;
+  const note=document.getElementById('ad-scatterNote');
+  if(note){
+    note.textContent = excluded
+      ? `이 기간에 노출이 없는 ${excluded}개 지면은 분포도에서 제외됐습니다 (히트맵에는 그대로 표시됩니다).`
+      : '';
+  }
+  if(!rows.length){
+    const box=document.querySelector('#ad-scatterCanvas');
+    if(box) box.outerHTML='<div id="ad-scatterCanvas" style="text-align:center;padding:40px;color:var(--text-dim);font-size:14.5px;">이 기간·필터에 표시할 지면이 없습니다.</div>';
+    return;
+  }
+  const totRev=rows.reduce((s,r)=>s+(r.revenue||0),0);
+  const impVals=rows.map(r=>r.impressions).sort((a,b)=>a-b);
+  const ecpmVals=rows.map(r=>r.ecpm).sort((a,b)=>a-b);
+  const medImp=impVals[Math.floor(impVals.length/2)]||0;
+  const medEcpm=ecpmVals[Math.floor(ecpmVals.length/2)]||0;
+
+  const points=rows.map(r=>({x:r.impressions,y:r.ecpm,
+    r:Math.max(4,Math.sqrt(Math.max(0,(r.revenue/totRev)||0)*100)*4), _p:r, _share:(r.revenue/totRev)||0}));
+  const colors=points.map(pt=>{
+    const hiVol=pt.x>=medImp, hiEff=pt.y>=medEcpm;
+    if(hiVol&&hiEff)return '#5ee6a4'; if(hiVol&&!hiEff)return '#f6b860';
+    if(!hiVol&&hiEff)return '#60a5fa'; return '#6b6980';
+  });
+
+  if(scatterChart){scatterChart.destroy();scatterChart=null;}
+  const canvasEl=document.getElementById('ad-scatterCanvas');
+  if(!canvasEl) return;
+  try{
+    const ctx=canvasEl.getContext('2d');
+    scatterChart=new Chart(ctx,{type:'bubble',
+      data:{datasets:[{data:points,backgroundColor:colors.map(c=>c+'cc'),borderColor:colors,borderWidth:1}]},
+      options:{responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{display:false},
+          tooltip:{backgroundColor:'#1e1e2c',borderColor:'#33334a',borderWidth:1,padding:10,
+            titleFont:{family:"'Malgun Gothic',sans-serif",size:13},bodyFont:{family:"'JetBrains Mono',monospace",size:12.5},
+            callbacks:{title:it=>it[0].raw._p.name,
+              label:it=>{const p=it.raw._p;return['노출수: '+f0.format(p.impressions),'eCPM: '+fmtMoneyPlain(p.ecpm),
+                '매출: '+fmtMoneyPlain(p.revenue)+' ('+f2.format(it.raw._share*100)+'%)'];}}}},
+        scales:{x:{type:'logarithmic',title:{display:true,text:'노출수 (로그 축)',color:'#54526a',font:{size:12}},
+            grid:{color:'#20202c'},ticks:{color:'#54526a',font:{family:"'JetBrains Mono',monospace",size:10.5},
+              callback:v=>Math.abs(v)>=1000?Math.round(v/1000)+'k':v},border:{color:'#282836'}},
+          y:{title:{display:true,text:MONEY_IS_USD?'eCPM ($)':'eCPM (원)',color:'#54526a',font:{size:12}},grid:{color:'#20202c'},
+            ticks:{color:'#54526a',font:{family:"'JetBrains Mono',monospace",size:10.5}},border:{display:false}}}}
+    });
+  }catch(err){
+    canvasEl.outerHTML='<div id="ad-scatterCanvas" style="text-align:center;padding:24px;color:var(--down);font-size:14.5px;">차트 오류: '+err.message+'</div>';
+    scatterChart=null;
+    console.error('scatter failed:',err);
+  }
+}
+
+// 정산금액·eCPM의 "최근 7일 vs 직전 7일" 변화율(%)을 지면별로 계산.
+// 7일씩 묶어서 비교하므로 하루짜리 노이즈에 흔들리지 않는다.
+// eCPM은 비율 지표라 각 7일 블록의 합계로 다시 계산해서 비교한다
+// (일별 eCPM 7개를 단순평균하면 노출량이 적은 날이 과대 반영되어 틀린 값이 나온다).
+// 데이터가 14일 미만이라 직전 7일을 확보할 수 없으면 null을 반환해 '–'로 표시된다.
+const CHANGE_WINDOW = 7;
+function computeChangeRates(placement){
+  const need = CHANGE_WINDOW * 2;
+  // 선택한 기간과 무관하게, 항상 데이터 전체의 마지막 14일을 기준으로 계산한다
+  // (기간 버튼을 바꿔도 변화율이 뒤집히지 않도록).
+  const n = DATA.dates.length;
+  if (n < need) return {revenueChange: null, ecpmChange: null};
+
+  function blockSums(fromIdx, toIdx){
+    let imp = 0, rev = 0, any = false;
+    for (let i = fromIdx; i <= toIdx; i++){
+      const c = cellOf(placement, i);
+      if (!c) continue;
+      imp += c.imp;
+      rev += c.rev;
+      any = true;
+    }
+    return any ? {imp, rev} : null;
+  }
+  const recent = blockSums(n - CHANGE_WINDOW, n - 1);
+  const prev = blockSums(n - need, n - CHANGE_WINDOW - 1);
+  if (!recent || !prev) return {revenueChange: null, ecpmChange: null};
+
+  // 비교 기준(직전 7일)이 0 이하면 비율 계산이 성립하지 않는다.
+  //  - 기준이 0인데 최근에 매출이 생김 → 증가율이 무한대. '신규'로 표기.
+  //  - 기준이 음수(정산 차감만 있던 기간) → 나눗셈에서 부호가 뒤집히고 값이
+  //    폭발한다(실제로 -331,337% 같은 값이 나왔던 원인). 비교 불가로 처리.
+  function ratioChange(recentVal, prevVal){
+    if (recentVal == null || prevVal == null) return null;
+    if (prevVal > 0) return ((recentVal / prevVal) - 1) * 100;
+    if (prevVal === 0) return recentVal > 0 ? 'new' : null;
+    return null; // prevVal < 0
+  }
+
+  const revChange = ratioChange(recent.rev, prev.rev);
+  const recentEcpm = recent.imp ? recent.rev / recent.imp * 1000 : null;
+  const prevEcpm = prev.imp ? prev.rev / prev.imp * 1000 : null;
+  const ecpmChange = ratioChange(recentEcpm, prevEcpm);
+  return {revenueChange: revChange, ecpmChange: ecpmChange};
+}
+
+function renderHeat(){
+  const rows=aggregate(accHeat);
+  const pctByKey={};
+  METRICS.filter(m=>m.key!=='name').forEach(m=>{
+    const vals=rows.map(r=>r[m.key]).filter(v=>v!=null).sort((a,b)=>a-b);
+    const map=new Map();
+    rows.forEach(r=>{
+      const v=r[m.key];
+      if(v==null){map.set(r.id,null);return;}
+      map.set(r.id, vals.length>1 ? (vals.indexOf(v)/(vals.length-1))*100 : 100);
+    });
+    pctByKey[m.key]=map;
+  });
+
+  const sortMeta = METRICS.find(m => m.key === sortKey);
+  const sortIsChange = !!(sortMeta && sortMeta.isChange);
+  const sorted=[...rows].sort((a,b)=>{
+    const av=a[sortKey], bv=b[sortKey];
+    // 변화율 열도 다른 지표 열과 동일하게 부호 그대로 정렬한다
+    // (내림차순=가장 많이 오른 지면부터, 오름차순=가장 많이 떨어진 지면부터).
+    // 비교할 직전 7일이 없어 null인 지면은 정렬 방향과 무관하게 항상 맨 아래로 보낸다.
+    if (sortIsChange){
+      // 숫자가 아닌 값(null='비교 불가', 'new'='신규')은 정렬 방향과 무관하게
+      // 항상 맨 아래로. 'new'는 신규라는 정보는 있으므로 비교 불가보다는 위에 둔다.
+      const rank = x => (typeof x === 'number' ? 0 : (x === 'new' ? 1 : 2));
+      const ra = rank(av), rb = rank(bv);
+      if (ra !== rb) return ra - rb;
+      if (ra !== 0) return 0;
+      return sortDir==='desc' ? bv-av : av-bv;
+    }
+    return sortDir==='desc'?(bv||0)-(av||0):(av||0)-(bv||0);
+  });
+
+  if(!sorted.length){
+    document.getElementById('ad-heatTable').innerHTML =
+      '<tbody><tr><td style="padding:16px;color:var(--text-dim);">이 필터에 해당하는 지면이 없습니다.</td></tr></tbody>';
+    return;
+  }
+
+  let h='<thead><tr><th>지면명</th>'+METRICS.map(m=>{
+    const arrow=sortKey===m.key?(sortDir==='desc'?' ▼':' ▲'):'';
+    return `<th data-k="${m.key}" class="${sortKey===m.key?'sorted':''}">${m.label}${arrow}</th>`;
+  }).join('')+'</tr></thead><tbody>';
+
+  sorted.forEach(r=>{
+    const isOpen = openId===r.id;
+    const pl = DATA.placements.find(x=>x.id===r.id);
+    // 전체 네트워크 보기일 때만 네트워크 태그 (특정 네트워크만 볼 땐 이미 그 네트워크라 중복 정보)
+    let nb = '';
+    if (pl && netFilter === 'all'){
+      const nets = netsByRevenue(pl);
+      nets.slice(0,2).forEach(n => { nb += `<span class="net-badge">${n}</span>`; });
+      if (nets.length > 2) nb += `<span class="net-badge" title="${nets.slice(2).join(', ')}">+${nets.length-2}</span>`;
+    }
+    const tag = r.account + (r.media ? ' · ' + r.media : '');
+    h+=`<tr><td class="name-cell${isOpen?' open':''}" data-id="${r.id}"><span class="arrow">▶</span>`
+      + `<div class="nm"><div class="nm-line">${r.name}${nb}</div><div class="acc-tag">${tag}</div></div></td>`;
+    METRICS.filter(m=>m.key!=='name').forEach(m=>{
+      const v=r[m.key];
+      // 변화율 열은 히트맵 색을 입히지 않는다 — 색은 '지면 간 절대값 순위'를 뜻하는데
+      // 변화율은 성격이 달라서 같은 색 규칙을 쓰면 오해를 부른다. 색 대신 자체 색상(초록/빨강)만 사용.
+      if (m.isChange){ h+=`<td class="chg-cell">${m.fmt(v)}</td>`; return; }
+      const pct=pctByKey[m.key].get(r.id);
+      const clickable = CHARTABLE.includes(m.key) && v!=null;
+      const cls = clickable ? ' class="clickable"' : '';
+      const attrs = clickable ? ` data-id="${r.id}" data-metric="${m.key}"` : '';
+      if(pct==null){h+=`<td${cls}${attrs}>${m.fmt(v)}</td>`;return;}
+      const t=pct/100, cr=Math.round(27+69*t), cg=Math.round(27+138*t), cb=Math.round(40+210*t);
+      const fg=pct>=55?'#0b1420':'#c7c5d6';
+      h+=`<td${cls}${attrs} style="background:rgb(${cr},${cg},${cb});color:${fg}">${m.fmt(v)}</td>`;
+    });
+    h+='</tr>';
+    if(isOpen) h+=renderDrillRow(r.id);
+  });
+  h+='</tbody>';
+  document.getElementById('ad-heatTable').innerHTML=h;
+
+  document.querySelectorAll('#ad-heatTable th[data-k]').forEach(th=>{
+    th.addEventListener('click',()=>{
+      const k=th.dataset.k;
+      if(sortKey===k)sortDir=sortDir==='desc'?'asc':'desc'; else{sortKey=k;sortDir='desc';}
+      renderHeat();
+    });
+  });
+  document.querySelectorAll('#ad-heatTable td.clickable').forEach(td=>{
+    td.addEventListener('click',()=>{
+      openModal(td.dataset.id, td.dataset.metric);
+    });
+  });
+  document.querySelectorAll('#ad-heatTable td.name-cell').forEach(td=>{
+    td.addEventListener('click',()=>{
+      const id=td.dataset.id;
+      openId = openId===id ? null : id;  // 같은 지면 다시 누르면 접기
+      renderHeat();
+    });
+  });
+}
+
+// 지면명 클릭 시 그 아래로 펼쳐지는 일자별 표 (현재 선택된 기간 기준)
+function renderDrillRow(id){
+  const p=DATA.placements.find(x=>x.id===id);
+  if(!p) return '';
+  const ds=periodDates(sI,eI);
+  let rowsHtml='';
+  for(let i=sI;i<=eI;i++){
+    const c=cellOf(p,i);
+    const imp=c?c.imp:null, clk=c?c.clk:null, rev=c?c.rev:null;
+    const ctr=imp?clk/imp:null, cpc=clk?rev/clk:null, ecpm=imp?rev/imp*1000:null;
+    rowsHtml+=`<tr><td>${DATA.dates[i]}</td>
+      <td>${imp==null?'<span class="na">–</span>':f0.format(imp)}</td>
+      <td>${clk==null?'<span class="na">–</span>':f0.format(clk)}</td>
+      <td>${ctr==null?'<span class="na">–</span>':f2.format(ctr*100)+'%'}</td>
+      <td>${cpc==null?'<span class="na">–</span>':fmtMoneyPlain(cpc)}</td>
+      <td>${rev==null?'<span class="na">–</span>':fmtMoneyPlain(rev)}</td>
+      <td>${ecpm==null?'<span class="na">–</span>':fmtMoneyPlain(ecpm)}</td></tr>`;
+  }
+  // colspan은 지면명 1칸 + 지표 칸 수와 정확히 맞춰야 표가 어긋나지 않는다
+  const colCount = 1 + METRICS.filter(m=>m.key!=='name').length;
+  return `<tr class="drill-row"><td colspan="${colCount}"><div class="drill-box">
+    <div class="drill-title">${p.name} · ${netFilter==='all'?'전체 네트워크':netFilter} · 일자별 수치 (${ds[0]} ~ ${ds[ds.length-1]})</div>
+    <table class="daily"><thead><tr><th>날짜</th><th>노출수</th><th>클릭수</th><th>CTR</th><th>CPC</th><th>정산금액</th><th>eCPM</th></tr></thead>
+    <tbody>${rowsHtml}</tbody></table>
+  </div></td></tr>`;
+}
+
+/* ---------- 팝업: 지표 하나 클릭 시에만 해당 데이터로 그래프를 만든다 (지연 렌더링) ---------- */
+// 팝업 기본 기간 = 항상 최근 14일. 변화율이 '이번주 7일 vs 전주 7일'(=최근 14일) 비교라서,
+// 팝업을 열었을 때 그 비교의 근거가 된 기간을 그대로 보여주는 편이 자연스럽다.
+// 메인 화면에서 현재 어떤 기간 버튼을 눌러뒀는지와는 무관하게 항상 이 기본값을 쓴다.
+const MODAL_DEFAULT_PRESET = '14';
+function defaultModalRange(){
+  const n = DATA.dates.length;
+  const e = n - 1;
+  const s = Math.max(0, n - parseInt(MODAL_DEFAULT_PRESET, 10));
+  return [s, e];
+}
+
+function openModal(placementId, metricKey){
+  const p = DATA.placements.find(x=>x.id===placementId);
+  if(!p) return;
+  const [defS, defE] = defaultModalRange();
+  modalState = {placementId, metricKey, sI: defS, eI: defE};
+  const m = METRICS.find(x=>x.key===metricKey);
+  document.getElementById('ad-modalTitle').textContent = `${p.name} · ${m.label}`;
+  document.getElementById('ad-modalSub').textContent = `(${p.account}${p.media?' · '+p.media:''} · ${netFilter==='all'?'전체 네트워크':netFilter})`;
+  document.querySelectorAll('#ad-modalPresetSeg button').forEach(b=>
+    b.classList.toggle('active', b.dataset.p===MODAL_DEFAULT_PRESET));
+  syncModalInputs();
+  document.getElementById('ad-modalBackdrop').classList.add('open');
+  renderModalChart();
+}
+
+function syncModalInputs(){
+  document.getElementById('ad-modalStartInput').value = DATA.dates[modalState.sI];
+  document.getElementById('ad-modalEndInput').value = DATA.dates[modalState.eI];
+}
+
+function onModalDateInputChange(){
+  if(!modalState) return;
+  const dates = DATA.dates;
+  const sVal = document.getElementById('ad-modalStartInput').value;
+  const eVal = document.getElementById('ad-modalEndInput').value;
+  let s = 0;
+  if (sVal){ s = dates.findIndex(d => d >= sVal); if (s === -1) s = dates.length - 1; }
+  let e = dates.length - 1;
+  if (eVal){ e = -1; for (let i = dates.length-1;i>=0;i--){ if (dates[i] <= eVal){ e=i; break; } } if (e===-1) e=0; }
+  if (s > e){ const t=s; s=e; e=t; }
+  modalState.sI = s; modalState.eI = e;
+  document.querySelectorAll('#ad-modalPresetSeg button').forEach(b=>b.classList.toggle('active', false));
+  renderModalChart();
+}
+
+function closeModal(){
+  document.getElementById('ad-modalBackdrop').classList.remove('open');
+  if(modalChart){ modalChart.destroy(); modalChart=null; }
+  modalState=null;
+}
+
+function modalSeries(){
+  const p = DATA.placements.find(x=>x.id===modalState.placementId);
+  const {sI:ms, eI:me} = modalState;
+  const dates = periodDates(ms,me);
+  const imp=[], clk=[], rev=[];
+  for(let i=ms;i<=me;i++){ const c=cellOf(p,i); imp.push(c?c.imp:null); clk.push(c?c.clk:null); rev.push(c?c.rev:null); }
+  let values;
+  if(modalState.metricKey==='impressions') values = imp;
+  else if(modalState.metricKey==='clicks') values = clk;
+  else if(modalState.metricKey==='revenue') values = rev;
+  else if(modalState.metricKey==='ctr') values = imp.map((v,i)=> v?clk[i]/v:null);
+  else if(modalState.metricKey==='cpc') values = clk.map((v,i)=> v?rev[i]/v:null);
+  else values = imp.map((v,i)=> v?rev[i]/v*1000:null); // ecpm
+  return {dates, values};
+}
+
+function renderModalChart(){
+  const {dates, values} = modalSeries();
+  const m = METRICS.find(x=>x.key===modalState.metricKey);
+  const color = getVar('--c-metric');
+
+  if(modalChart){ modalChart.destroy(); modalChart=null; }
+  const box = document.getElementById('ad-modalChartBox');
+  if(!document.getElementById('ad-modalCanvas')){
+    box.innerHTML = '<canvas id="ad-modalCanvas"></canvas>';
+  }
+  try{
+    const ctx = document.getElementById('ad-modalCanvas').getContext('2d');
+    const gradient = ctx.createLinearGradient(0,0,0,260);
+    gradient.addColorStop(0, color+'33'); gradient.addColorStop(1, color+'00');
+    const useBar = values.length<=3;
+    modalChart = new Chart(ctx,{type: useBar?'bar':'line',
+      data:{labels:dates.map(d=>d.slice(5).replace('-','/')),
+        datasets:[{data:values, borderColor:color, backgroundColor: useBar?color:gradient,
+          fill: !useBar, spanGaps:false, tension:.3, borderWidth:2,
+          pointRadius: values.length<=20?3:0, pointHoverRadius:5, borderRadius:4, maxBarThickness:56}]},
+      options:{responsive:true, maintainAspectRatio:false,
+        interaction:{mode:'index', intersect:false},
+        plugins:{legend:{display:false},
+          tooltip:{backgroundColor:'#1e1e2c',borderColor:'#33334a',borderWidth:1,padding:9,
+            titleFont:{family:"'JetBrains Mono',monospace",size:12},bodyFont:{family:"'JetBrains Mono',monospace",size:12},
+            callbacks:{label:it=> it.parsed.y==null?'데이터 없음': m.fmt(it.parsed.y)}}},
+        scales:{x:{grid:{display:false},border:{color:'#282836'},
+            ticks:{color:'#54526a',font:{family:"'JetBrains Mono',monospace",size:10.5},maxRotation:0}},
+          y:{grid:{color:'#20202c'},border:{display:false},
+            ticks:{color:'#54526a',font:{family:"'JetBrains Mono',monospace",size:10.5},
+              callback:v=> modalState.metricKey==='ctr' ? (v*100).toFixed(1)+'%' : (Math.abs(v)>=10000?Math.round(v/10000)+'만':f0.format(v))}}}}
+    });
+  }catch(err){
+    box.innerHTML = `<div style="text-align:center;padding:24px;color:var(--down);font-size:14.5px;">차트 오류: ${err.message}</div>`;
+    modalChart=null;
+    console.error('modal chart failed:',err);
+  }
+}
+
+document.getElementById('ad-presetSeg').addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b)return; applyPreset(b.dataset.p);
+});
+document.getElementById('ad-accSegHeat').addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b)return; applyAccHeat(b.dataset.acc);
+});
+document.getElementById('ad-accSegScatter').addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b)return; applyAccScatter(b.dataset.acc);
+});
+document.getElementById('ad-netSelect').addEventListener('change',e=> applyNetFilter(e.target.value));
+document.getElementById('ad-startInput').addEventListener('change', onDateInputChange);
+document.getElementById('ad-endInput').addEventListener('change', onDateInputChange);
+document.getElementById('ad-modalPresetSeg').addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b||!modalState)return;
+  document.querySelectorAll('#ad-modalPresetSeg button').forEach(x=>x.classList.toggle('active',x===b));
+  const n=DATA.dates.length, p=b.dataset.p;
+  modalState.eI=n-1; modalState.sI=(p==='all') ? 0 : Math.max(0, n-parseInt(p,10));
+  syncModalInputs();
+  renderModalChart();
+});
+document.getElementById('ad-modalStartInput').addEventListener('change', onModalDateInputChange);
+document.getElementById('ad-modalEndInput').addEventListener('change', onModalDateInputChange);
+document.getElementById('ad-modalClose').addEventListener('click', closeModal);
+document.getElementById('ad-modalBackdrop').addEventListener('click', e=>{
+  if(e.target.id==='ad-modalBackdrop') closeModal();
+});
+document.addEventListener('keydown', e=>{ if(e.key==='Escape' && modalState) closeModal(); });
+
+// 요약 탭(ADOP / ADOP_Bidmad)의 날짜별 합계와 원본(raw) 합계가 어긋난 날 — 원본이 빠졌거나 중복된 신호
+function renderDataChecks(payload){
+  const warn = document.getElementById('ad-loadWarn');
+  const failed = (payload.accounts || []).filter(a => payload.loaded && payload.loaded[a] === false);
+  if (failed.length){
+    warn.style.display = '';
+    warn.textContent = '⚠ ' + failed.join(' · ') + ' 원본 탭을 읽지 못해 이 계정은 목록에서 빠져 있습니다. 시트 이름(ADOP_raw / ADOP_Bidmad_raw)과 헤더를 확인해주세요.';
+  } else {
+    warn.style.display = 'none';
+  }
+
+  const el = document.getElementById('ad-reconcileBanner');
+  const rc = payload.reconcile || [];
+  if (!rc.length){ el.style.display='none'; }
+  else {
+    el.style.display = '';
+    const usd = v => v==null ? '없음' : '$' + _usdFmt.format(v);
+    const shown = rc.slice(0, 5).map(x => `${x.account} ${x.date}: 요약 ${usd(x.summary)} / 원본 ${usd(x.raw)}`).join('<br/>');
+    const more = rc.length > 5 ? `<br/>외 ${rc.length - 5}건` : '';
+    el.innerHTML = `<b>요약 탭과 원본(raw) 합계가 다른 날 ${rc.length}건</b> — 이 날짜들은 지면별 합이 통합 매출 화면의 ADOP 값과 다를 수 있습니다. `
+      + `보통 원본 수집이 빠졌거나(원본 없음), 같은 날짜가 여러 번 쌓였거나, 요약 행만 지운 경우입니다.<br/>`
+      + `<span class="rc-list">${shown}${more}</span>`;
+  }
+
+  const dup = document.getElementById('ad-dupNote');
+  if (payload.duplicateRows){
+    dup.style.display = '';
+    dup.textContent = `원본에 같은 행이 여러 번 기록된 ${payload.duplicateRows}건은 1건으로 합쳐 집계했습니다.`;
+  } else {
+    dup.style.display = 'none';
+  }
+}
+
+function initPage(payload){
+  DATA = payload;
+  MONEY_IS_USD = payload.fxAvailable === false;
+  renderDataChecks(payload);
+  if (!payload.dates || !payload.dates.length){
+    document.getElementById('ad-heatTable').innerHTML =
+      '<tbody><tr><td style="padding:16px;color:var(--text-dim);">표시할 데이터가 없습니다.</td></tr></tbody>';
+    const sc = document.getElementById('ad-scatterCanvas');
+    if (sc) sc.outerHTML = '<div id="ad-scatterCanvas" style="text-align:center;padding:40px;color:var(--text-dim);font-size:14.5px;">표시할 데이터가 없습니다.</div>';
+    return;
+  }
+  const sIn = document.getElementById('ad-startInput'), eIn = document.getElementById('ad-endInput');
+  sIn.min = payload.dates[0]; sIn.max = payload.dates[payload.dates.length-1];
+  eIn.min = payload.dates[0]; eIn.max = payload.dates[payload.dates.length-1];
+  const msIn = document.getElementById('ad-modalStartInput'), meIn = document.getElementById('ad-modalEndInput');
+  msIn.min = payload.dates[0]; msIn.max = payload.dates[payload.dates.length-1];
+  meIn.min = payload.dates[0]; meIn.max = payload.dates[payload.dates.length-1];
+  renderPlacementFilterList();
+  renderNetSelect();
+  openId=null;
+  if (modalState) closeModal();
+  const fxWarn = document.getElementById('ad-fxWarn');
+  if (fxWarn) fxWarn.style.display = payload.fxAvailable ? 'none' : '';
+  applyPreset(activePreset || '7');
+}
+  return { init: initPage, reinit: initPage };
+})();
+
+function loadData(){
+  return fetch('./adop.json?t=' + Date.now(), {cache:'no-store'}).then(res => {
+    if (!res.ok) throw new Error('adop.json 요청 실패: HTTP ' + res.status);
+    return res.json();
+  });
+}
+
+function applyShared(payload){
+  if (payload && payload.dates && payload.dates.length){
+    document.getElementById('ad-dateRange').textContent =
+      payload.dates[0].replace(/-/g,'.') + ' – ' + payload.dates[payload.dates.length-1].replace(/-/g,'.');
+  }
+  document.getElementById('ad-generatedAt').textContent = (payload && payload.generatedAt) || '–';
+}
+
+loadData().then(p => { applyShared(p); AdopDetail.init(p); })
+  .catch(err => {
+    document.getElementById('ad-generatedAt').textContent = '로드 실패';
+    console.error('initial load failed:', err);
+  });
+
+const REFRESH_MINUTES = 15;
+let refreshing = false;
+function refreshData(){
+  if (refreshing) return;
+  refreshing = true;
+  const ind = document.getElementById('ad-refreshIndicator');
+  ind.textContent = '갱신 중…';
+  loadData().then(p => { applyShared(p); AdopDetail.reinit(p); ind.textContent=''; refreshing=false; })
+    .catch(() => { ind.textContent='갱신 실패'; refreshing=false; });
+}
+setInterval(refreshData, REFRESH_MINUTES * 60 * 1000);
+document.getElementById('ad-refreshBtn').addEventListener('click', refreshData);
+</script>
+</body>
+</html>
