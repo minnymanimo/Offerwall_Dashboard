@@ -387,6 +387,31 @@
   .data-note{font-size:13px;color:var(--text-faint);margin:-8px 0 18px;}
   .rc-list{font-family:var(--mono);font-size:12.5px;color:var(--text-faint);}
 
+
+  /* ---- 일별 지표 (전체 지면 합계) — Mobwith 상세와 같은 구성 ---- */
+  .seg-caption{font-size:12.5px;color:var(--text-faint);margin-right:2px;}
+  .split-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px 22px;margin:0 0 18px;}
+  .split-label{font-family:var(--mono);font-size:12.5px;letter-spacing:.06em;color:var(--text-dim);margin-bottom:8px;}
+  .split-period{color:var(--text-faint);}
+  .split-headline{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:16px;}
+  .split-total{font-size:31px;font-weight:700;letter-spacing:-.02em;line-height:1.1;}
+  .split-delta{font-family:var(--mono);font-size:14px;font-weight:600;}
+  .split-delta .up{color:var(--up);} .split-delta .down{color:var(--down);}
+  .split-delta .delta-sub{color:var(--text-faint);font-weight:400;font-size:11.5px;margin-left:5px;}
+  .split-groups{display:grid;gap:12px;}
+  .split-gcard{background:var(--surface-2);border:1px solid var(--border);border-radius:12px;padding:16px 18px;position:relative;overflow:hidden;}
+  .split-gcard::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--gc);}
+  .sg-label{font-family:var(--mono);font-size:12px;letter-spacing:.06em;margin-bottom:7px;display:flex;align-items:center;gap:7px;color:var(--gc);}
+  .sg-dot{width:9px;height:9px;border-radius:50%;flex:none;background:var(--gc);}
+  .sg-value{font-size:22px;font-weight:700;letter-spacing:-.01em;}
+  .sg-meta{font-family:var(--mono);font-size:12.5px;color:var(--text-faint);margin-top:6px;display:flex;gap:10px;flex-wrap:wrap;}
+  .sg-meta .up{color:var(--up);} .sg-meta .down{color:var(--down);}
+  .sg-meta .is-new{color:var(--up);background:rgba(94,230,164,.12);border-radius:4px;padding:1px 6px;font-size:11.5px;}
+  .daily-chartgrid .chart-box{height:128px;}
+  .table-title.is-toggle{display:flex;align-items:center;gap:10px;cursor:pointer;margin-bottom:0;}
+  .table-title.is-toggle[aria-expanded="true"]{margin-bottom:16px;}
+  .daily-table-card{margin-bottom:8px;}
+  @media (max-width:640px){ .split-groups{grid-template-columns:1fr !important;} }
 </style>
 </head>
 <body>
@@ -427,6 +452,52 @@
 
   
 
+
+
+  <div class="mw-section-title">ADOP · 일별 지표</div>
+  <div class="mw-section-sub">점신·Bidmad 두 계정의 전체 지면·전체 네트워크를 더한 날짜별 지표입니다. 기간은 아래 지면별 히트맵과 별개로 선택합니다.</div>
+
+  <div class="split-card">
+    <div class="split-label">정산금액 <span class="split-period" id="add-splitPeriod">–</span></div>
+    <div class="split-headline">
+      <div class="split-total" id="add-splitTotal">–</div>
+      <div class="split-delta" id="add-splitDelta"></div>
+    </div>
+    <div class="split-groups" id="add-splitGroups"></div>
+  </div>
+
+  <div class="controls-row">
+    <div class="period-label" id="add-periodLabel">기간: –</div>
+    <div class="controls">
+      <span class="seg-caption">아래 지표 기준</span>
+      <div class="seg" id="add-seriesSeg"></div>
+      <div class="seg" id="add-presetSeg">
+        <button data-preset="mtd" class="active">이번 달</button>
+        <button data-preset="1">최근 1일</button>
+        <button data-preset="7">7일</button>
+        <button data-preset="14">14일</button>
+        <button data-preset="30">30일</button>
+        <button data-preset="all">전체</button>
+      </div>
+      <div class="date-range">
+        <input type="date" id="add-startInput" aria-label="시작일" />
+        <span>–</span>
+        <input type="date" id="add-endInput" aria-label="종료일" />
+      </div>
+    </div>
+  </div>
+
+  <section class="kpi-grid" id="add-kpiGrid"></section>
+  <section class="chart-grid daily-chartgrid" id="add-chartGrid"></section>
+  <section class="table-card daily-table-card">
+    <div class="table-title is-toggle" id="add-tableToggle" aria-expanded="false">
+      일별 데이터<span class="lc-toggle" id="add-tableToggleLabel">펼치기 ▼</span>
+    </div>
+    <div id="add-tableWrap" style="display:none"><table class="datatable" id="add-dataTable"></table></div>
+  </section>
+
+  <div class="mw-section-title">ADOP · 지면별 현황</div>
+  <div class="mw-section-sub">아래 기간·필터는 위 일별 지표와 별개로 선택합니다.</div>
 
   <div class="controls-row">
     <div class="period-label" id="ad-periodLabel">기간: –</div>
@@ -1258,6 +1329,293 @@ function initPage(payload){
   return { init: initPage, reinit: initPage };
 })();
 
+
+/* =====================================================================
+ * 일별 지표 (전체 지면 합계) — Mobwith 상세의 '일별 지표'와 같은 구성.
+ * 지면별 데이터(placements)를 날짜마다 더해 만든다. 그룹(OS·계정)별로도
+ * 따로 더해 두어서 상단 카드와 '전체/그룹' 전환에 쓴다.
+ * 기간 선택은 아래 지면별 히트맵과 별개다.
+ * ===================================================================== */
+function makeDailyOverview(cfg){
+  const P = cfg.prefix;
+  const $ = id => document.getElementById(P + '-' + id);
+  const n0 = new Intl.NumberFormat('ko-KR', {maximumFractionDigits:0});
+  const n2 = new Intl.NumberFormat('ko-KR', {maximumFractionDigits:2});
+  let money = v => v == null ? '–' : fmtKrwPlain(v);
+  const METRICS = [
+    {key:'impressions', label:'노출수',   fmt: v => v==null?'–':n0.format(v)},
+    {key:'clicks',      label:'클릭수',   fmt: v => v==null?'–':n0.format(v)},
+    {key:'ctr',         label:'CTR',     fmt: v => v==null?'–':n2.format(v*100)+'%'},
+    {key:'cpc',         label:'CPC',     fmt: v => money(v)},
+    {key:'revenue',     label:'정산금액', fmt: v => money(v)},
+    {key:'ecpm',        label:'eCPM',    fmt: v => money(v)},
+  ];
+  let D = null, SERIES = {}, GROUPS = [];
+  let sI = 0, eI = 0, preset = 'mtd', active = 'all', charts = [], tableOpen = false;
+  let sortKey = 'date', sortDir = 'asc', wired = false;
+
+  function build(payload){
+    D = payload;
+    const n = D.dates.length;
+    const blank = () => ({imp: new Array(n).fill(null), clk: new Array(n).fill(null), rev: new Array(n).fill(null)});
+    const acc = {all: blank()};
+    const present = new Set();
+    (D.placements || []).forEach(p => {
+      const g = cfg.groupOf(p);
+      present.add(g);
+      if (!acc[g]) acc[g] = blank();
+      for (let i = 0; i < n; i++){
+        const c = cfg.cellOf(p, i);
+        if (!c) continue;
+        [acc.all, acc[g]].forEach(a => {
+          a.imp[i] = (a.imp[i] || 0) + c.imp; a.clk[i] = (a.clk[i] || 0) + c.clk; a.rev[i] = (a.rev[i] || 0) + c.rev;
+        });
+      }
+    });
+    SERIES = {};
+    Object.keys(acc).forEach(k => {
+      const a = acc[k];
+      SERIES[k] = {
+        impressions: a.imp, clicks: a.clk, revenue: a.rev,
+        ctr: a.imp.map((v, i) => v ? a.clk[i] / v : null),
+        cpc: a.clk.map((v, i) => v ? a.rev[i] / v : null),
+        ecpm: a.imp.map((v, i) => v ? a.rev[i] / v * 1000 : null),
+      };
+    });
+    // 데이터가 있는 그룹만 카드·버튼으로 (예: '미지정' OS는 있을 때만)
+    GROUPS = cfg.groups.filter(g => present.has(g.key));
+    if (active !== 'all' && !SERIES[active]) active = 'all';
+  }
+
+  function agg(s, e, key){
+    const S = SERIES[key || active];
+    let imp = 0, clk = 0, rev = 0, any = false;
+    if (S) for (let i = s; i <= e; i++){
+      if (S.impressions[i] != null){ imp += S.impressions[i]; clk += S.clicks[i] || 0; rev += S.revenue[i] || 0; any = true; }
+    }
+    return {impressions: any?imp:null, clicks: any?clk:null, revenue: any?rev:null,
+      ctr: imp ? clk/imp : null, cpc: clk ? rev/clk : null, ecpm: imp ? rev/imp*1000 : null};
+  }
+
+  function shiftMonth(ds){
+    const [y, m, d] = ds.split('-').map(Number);
+    let py = y, pm = m - 1; if (pm === 0){ pm = 12; py = y - 1; }
+    const last = new Date(py, pm, 0).getDate();
+    return `${py}-${String(pm).padStart(2,'0')}-${String(Math.min(d, last)).padStart(2,'0')}`;
+  }
+  function prevMonthRange(){
+    const ps = shiftMonth(D.dates[sI]), pe = shiftMonth(D.dates[eI]);
+    let s = -1, e = -1;
+    D.dates.forEach((d, i) => { if (d >= ps && d <= pe){ if (s === -1) s = i; e = i; } });
+    return s === -1 ? null : [s, e];
+  }
+
+  function applyPreset(p){
+    preset = p;
+    const n = D.dates.length;
+    eI = n - 1;
+    if (p === 'mtd'){
+      const ym = D.dates[n-1].slice(0, 7); let s = n - 1;
+      for (let i = n - 1; i >= 0; i--){ if (D.dates[i].slice(0,7) === ym) s = i; else break; }
+      sI = s;
+    } else sI = p === 'all' ? 0 : Math.max(0, n - parseInt(p, 10));
+    syncInputs(); renderAll();
+  }
+  function syncInputs(){
+    $('startInput').value = D.dates[sI]; $('endInput').value = D.dates[eI];
+    document.querySelectorAll('#' + P + '-presetSeg button').forEach(b => b.classList.toggle('active', b.dataset.preset === preset));
+  }
+  function onDateInput(){
+    const ds = D.dates, sv = $('startInput').value, ev = $('endInput').value;
+    let s = 0; if (sv){ s = ds.findIndex(d => d >= sv); if (s === -1) s = ds.length - 1; }
+    let e = ds.length - 1; if (ev){ e = -1; for (let i = ds.length-1; i >= 0; i--){ if (ds[i] <= ev){ e = i; break; } } if (e === -1) e = 0; }
+    if (s > e){ const t = s; s = e; e = t; }
+    sI = s; eI = e; preset = null; syncInputs(); renderAll();
+  }
+
+  function renderSeriesSeg(){
+    $('seriesSeg').innerHTML = '<button data-s="all">전체</button>' +
+      GROUPS.map(g => `<button data-s="${g.key}">${g.label}</button>`).join('');
+    document.querySelectorAll('#' + P + '-seriesSeg button').forEach(b => b.classList.toggle('active', b.dataset.s === active));
+    $('seriesSeg').style.display = GROUPS.length > 1 ? '' : 'none';
+  }
+
+  function deltaHtml(key, cur){
+    const pr = prevMonthRange();
+    if (!pr || cur == null) return '';
+    const prev = agg(pr[0], pr[1], key).revenue;
+    if (prev == null) return '';
+    if (prev === 0) return cur > 0 ? '<span class="is-new" title="저번 달 같은 기간에는 매출이 없었습니다">신규</span>' : '';
+    if (prev < 0) return '';
+    const ch = (cur / prev - 1) * 100;
+    return `<span class="${ch>=0?'up':'down'}">${ch>=0?'▲':'▼'} ${Math.abs(ch).toFixed(1)}%</span>`;
+  }
+  function renderSplit(){
+    const n = eI - sI + 1;
+    $('splitPeriod').textContent = `· ${D.dates[sI]} ~ ${D.dates[eI]} (${n}일)`;
+    const all = agg(sI, eI, 'all').revenue;
+    $('splitTotal').textContent = money(all);
+    const d = deltaHtml('all', all);
+    $('splitDelta').innerHTML = d ? d + '<span class="delta-sub">저번 달 같은 기간 대비</span>' : '';
+    const box = $('splitGroups');
+    box.style.gridTemplateColumns = `repeat(${Math.max(1, GROUPS.length)}, 1fr)`;
+    box.innerHTML = GROUPS.map(g => {
+      const v = agg(sI, eI, g.key).revenue;
+      const pct = (all && v != null) ? `비중 ${(v / all * 100).toFixed(1)}%` : '';
+      return `<div class="split-gcard" style="--gc:${g.color}">
+        <div class="sg-label"><span class="sg-dot"></span>${g.label}</div>
+        <div class="sg-value">${money(v)}</div>
+        <div class="sg-meta">${[pct, deltaHtml(g.key, v)].filter(Boolean).join(' ')}</div>
+      </div>`;
+    }).join('');
+    box.style.display = GROUPS.length > 1 ? '' : 'none';
+  }
+
+  function renderKpis(){
+    const a = agg(sI, eI), single = sI === eI;
+    const prev = (single && sI > 0) ? agg(sI - 1, sI - 1) : null;
+    $('kpiGrid').innerHTML = METRICS.map(m => {
+      const ratio = m.key === 'ctr' || m.key === 'cpc' || m.key === 'ecpm';
+      let dh = '';
+      if (single && prev && prev[m.key] != null && a[m.key] != null && prev[m.key] !== 0){
+        const ch = (a[m.key] - prev[m.key]) / Math.abs(prev[m.key]) * 100;
+        dh = `<div class="kpi-delta"><span class="${ch>=0?'arrow-up':'arrow-down'}">${ch>=0?'▲':'▼'} ${Math.abs(ch).toFixed(1)}%</span><span>전일 대비</span></div>`;
+      } else if (single) dh = '<div class="kpi-delta"><span>전일 데이터 없음</span></div>';
+      return `<div class="kpi-card"><div class="kpi-label">${m.label}</div><div class="kpi-value">${m.fmt(a[m.key])}</div>
+        <div class="kpi-unit">${ratio ? '기간 가중평균' : '기간 합계'}</div>${dh}</div>`;
+    }).join('');
+    const label = active === 'all' ? '' : ' · ' + (GROUPS.find(g => g.key === active) || {}).label;
+    $('periodLabel').textContent = `기간: ${D.dates[sI]} ~ ${D.dates[eI]} (${eI - sI + 1}일)${label}`;
+  }
+
+  function renderCharts(){
+    charts.forEach(c => c.destroy()); charts = [];
+    const grid = $('chartGrid'); grid.innerHTML = '';
+    if (sI === eI){ grid.style.display = 'none'; return; }   // 하루면 막대 1개라 카드·표와 같은 숫자 반복
+    grid.style.display = '';
+    const dates = D.dates.slice(sI, eI + 1), labels = dates.map(d => d.slice(5).replace('-', '/'));
+    const every = Math.max(1, Math.ceil(labels.length / 6));
+    const color = getComputedStyle(document.documentElement).getPropertyValue('--c-metric').trim() || '#8b6fff';
+    const bar = labels.length <= 3;
+    METRICS.forEach(m => {
+      const card = document.createElement('div');
+      card.className = 'chart-card';
+      card.innerHTML = `<div class="chart-title">${m.label}</div><div class="chart-box"><canvas></canvas></div>`;
+      grid.appendChild(card);
+      const vals = SERIES[active][m.key].slice(sI, eI + 1);
+      const ctx = card.querySelector('canvas').getContext('2d');
+      const grad = ctx.createLinearGradient(0, 0, 0, 150);
+      grad.addColorStop(0, color + '33'); grad.addColorStop(1, color + '00');
+      try {
+        charts.push(new Chart(ctx, {
+          type: bar ? 'bar' : 'line',
+          data: {labels, datasets: [bar
+            ? {data: vals, backgroundColor: color, borderRadius: 4, maxBarThickness: 56}
+            : {data: vals, borderColor: color, backgroundColor: grad, fill: true, spanGaps: false, tension: 0.3,
+               borderWidth: 2, pointRadius: labels.length <= 20 ? 2 : 0, pointHoverRadius: 4}]},
+          options: {
+            responsive: true, maintainAspectRatio: false, interaction: {mode: 'index', intersect: false},
+            plugins: {legend: {display: false}, tooltip: {
+              backgroundColor: '#1e1e2c', borderColor: '#33334a', borderWidth: 1, padding: 9,
+              titleFont: {family: "'JetBrains Mono',monospace", size: 12}, bodyFont: {family: "'JetBrains Mono',monospace", size: 12},
+              callbacks: {title: it => dates[it[0].dataIndex], label: it => it.parsed.y === null ? '데이터 없음' : m.fmt(it.parsed.y)}}},
+            scales: {
+              x: {grid: {display: false}, border: {color: '#282836'},
+                ticks: {color: '#54526a', font: {family: "'JetBrains Mono',monospace", size: 10}, maxRotation: 0, autoSkip: false,
+                  callback: function(v, i){ return (i % every === 0 || i === labels.length - 1) ? this.getLabelForValue(v) : ''; }}},
+              y: {grid: {color: '#20202c'}, border: {display: false},
+                ticks: {color: '#54526a', font: {family: "'JetBrains Mono',monospace", size: 10},
+                  callback: v => m.key === 'ctr' ? (v*100).toFixed(1) + '%' : (Math.abs(v) >= 10000 ? Math.round(v/1000) + 'k' : n2.format(v))}}
+            }
+          }
+        }));
+      } catch (err){
+        card.querySelector('.chart-box').innerHTML = `<div class="chart-error-box">차트 오류: ${err.message}</div>`;
+      }
+    });
+  }
+
+  function applyToggle(){
+    $('tableWrap').style.display = tableOpen ? '' : 'none';
+    $('tableToggle').setAttribute('aria-expanded', tableOpen ? 'true' : 'false');
+    $('tableToggleLabel').textContent = tableOpen ? '접기 ▲' : '펼치기 ▼';
+  }
+  function renderTable(){
+    const dates = D.dates.slice(sI, eI + 1), latest = dates[dates.length - 1];
+    const rows = dates.map((d, k) => { const r = {date: d}; METRICS.forEach(m => r[m.key] = SERIES[active][m.key][sI + k]); return r; });
+    rows.sort((a, b) => {
+      const av = a[sortKey], bv = b[sortKey];
+      if (sortKey === 'date') return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+      if (av == null && bv == null) return 0; if (av == null) return 1; if (bv == null) return -1;
+      return sortDir === 'asc' ? av - bv : bv - av;
+    });
+    const cols = [{key: 'date', label: '날짜'}, ...METRICS];
+    const thead = '<thead><tr>' + cols.map(c => `<th data-key="${c.key}" class="${sortKey===c.key?'sorted':''}">${c.label}${sortKey===c.key?(sortDir==='asc'?' ▲':' ▼'):''}</th>`).join('') + '</tr></thead>';
+    const body = rows.map(r => '<tr' + (r.date === latest ? ' class="latest-row"' : '') + '><td>' + r.date + (r.date === latest ? ' <span class="latest-tag">최신</span>' : '') + '</td>' +
+      METRICS.map(m => `<td class="${r[m.key]==null?'na':''}">${m.fmt(r[m.key])}</td>`).join('') + '</tr>').join('');
+    $('dataTable').innerHTML = thead + '<tbody>' + body + '</tbody>';
+  }
+
+  function renderAll(){ renderSplit(); renderKpis(); renderCharts(); renderTable(); }
+
+  function wire(){
+    if (wired) return; wired = true;
+    $('presetSeg').addEventListener('click', ev => { const b = ev.target.closest('button'); if (b) applyPreset(b.dataset.preset); });
+    $('seriesSeg').addEventListener('click', ev => {
+      const b = ev.target.closest('button'); if (!b) return;
+      active = b.dataset.s; renderSeriesSeg(); renderAll();
+    });
+    $('startInput').addEventListener('change', onDateInput);
+    $('endInput').addEventListener('change', onDateInput);
+    $('tableToggle').addEventListener('click', () => { tableOpen = !tableOpen; applyToggle(); });
+    $('dataTable').addEventListener('click', ev => {
+      const th = ev.target.closest('th'); if (!th) return;
+      const k = th.dataset.key;
+      if (sortKey === k) sortDir = sortDir === 'asc' ? 'desc' : 'asc'; else { sortKey = k; sortDir = k === 'date' ? 'asc' : 'desc'; }
+      renderTable();
+    });
+  }
+
+  function init(payload){
+    wire(); applyToggle();
+    if (cfg.moneyFmt) money = cfg.moneyFmt(payload);
+    if (!payload || !payload.dates || !payload.dates.length){
+      $('kpiGrid').innerHTML = '<div style="color:var(--text-dim);font-size:14.5px;">표시할 데이터가 없습니다.</div>';
+      return;
+    }
+    const prevStart = D && D.dates.length ? D.dates[sI] : null, prevEnd = D && D.dates.length ? D.dates[eI] : null;
+    build(payload);
+    renderSeriesSeg();
+    ['startInput', 'endInput'].forEach(id => { $(id).min = D.dates[0]; $(id).max = D.dates[D.dates.length - 1]; });
+    if (preset !== null || prevStart === null){ applyPreset(preset || 'mtd'); return; }
+    // 날짜를 직접 골라둔 상태에서 새로고침하면 그 날짜 범위를 유지
+    let s = D.dates.findIndex(d => d >= prevStart); if (s === -1) s = 0;
+    let e = -1; for (let i = D.dates.length - 1; i >= 0; i--){ if (D.dates[i] <= prevEnd){ e = i; break; } } if (e === -1) e = D.dates.length - 1;
+    sI = s; eI = Math.max(s, e); syncInputs(); renderAll();
+  }
+  return {init, reinit: init};
+}
+
+const AdDaily = makeDailyOverview({
+  prefix: 'add',
+  groupOf: p => p.account,
+  // 지면 안의 모든 네트워크를 더한다(아래 히트맵의 네트워크 선택과 무관)
+  cellOf: (p, i) => {
+    let imp = 0, clk = 0, rev = 0, any = false;
+    Object.keys(p.byNet).forEach(n => {
+      const c = p.byNet[n];
+      if (c.impressions[i] == null) return;
+      imp += c.impressions[i] || 0; clk += c.clicks[i] || 0; rev += c.revenue[i] || 0; any = true;
+    });
+    return any ? {imp, clk, rev} : null;
+  },
+  groups: [
+    {key: '점신', label: '점신', color: '#f6789e'},
+    {key: 'Bidmad', label: 'Bidmad', color: '#e879f9'},
+  ],
+  moneyFmt: () => fmtMoneyPlain && (v => v == null ? '–' : fmtMoneyPlain(v)),
+});
+
 function loadData(){
   return fetch('./adop.json?t=' + Date.now(), {cache:'no-store'}).then(res => {
     if (!res.ok) throw new Error('adop.json 요청 실패: HTTP ' + res.status);
@@ -1273,7 +1631,7 @@ function applyShared(payload){
   document.getElementById('ad-generatedAt').textContent = (payload && payload.generatedAt) || '–';
 }
 
-loadData().then(p => { applyShared(p); AdopDetail.init(p); })
+loadData().then(p => { applyShared(p); AdopDetail.init(p); AdDaily.init(p); })
   .catch(err => {
     document.getElementById('ad-generatedAt').textContent = '로드 실패';
     console.error('initial load failed:', err);
@@ -1286,7 +1644,7 @@ function refreshData(){
   refreshing = true;
   const ind = document.getElementById('ad-refreshIndicator');
   ind.textContent = '갱신 중…';
-  loadData().then(p => { applyShared(p); AdopDetail.reinit(p); ind.textContent=''; refreshing=false; })
+  loadData().then(p => { applyShared(p); AdopDetail.reinit(p); AdDaily.reinit(p); ind.textContent=''; refreshing=false; })
     .catch(() => { ind.textContent='갱신 실패'; refreshing=false; });
 }
 setInterval(refreshData, REFRESH_MINUTES * 60 * 1000);
