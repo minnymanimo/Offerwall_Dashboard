@@ -412,6 +412,7 @@
   .table-title.is-toggle[aria-expanded="true"]{margin-bottom:16px;}
   .daily-table-card{margin-bottom:8px;}
   @media (max-width:640px){ .split-groups{grid-template-columns:1fr !important;} }
+  .seg button:disabled{opacity:.35;cursor:not-allowed;}
 </style>
 </head>
 <body>
@@ -473,6 +474,7 @@
       <div class="seg" id="add-seriesSeg"></div>
       <div class="seg" id="add-presetSeg">
         <button data-preset="mtd" class="active">이번 달</button>
+        <button data-preset="lastmonth">저번 달</button>
         <button data-preset="1">최근 1일</button>
         <button data-preset="7">7일</button>
         <button data-preset="14">14일</button>
@@ -1336,6 +1338,17 @@ function initPage(payload){
  * 따로 더해 두어서 상단 카드와 '전체/그룹' 전환에 쓴다.
  * 기간 선택은 아래 지면별 히트맵과 별개다.
  * ===================================================================== */
+// '저번 달' = 데이터상 최신 날짜가 속한 달의 바로 전 달(1일~말일). 그 달 데이터가 없으면 null.
+function lastMonthRangeOf(dates){
+  const n = dates.length; if (!n) return null;
+  const [y, m] = dates[n-1].slice(0, 7).split('-').map(Number);
+  const pm = m === 1 ? 12 : m - 1, py = m === 1 ? y - 1 : y;
+  const ym = py + '-' + String(pm).padStart(2, '0');
+  let s = -1, e = -1;
+  for (let i = 0; i < n; i++){ if (dates[i].slice(0, 7) === ym){ if (s === -1) s = i; e = i; } }
+  return s === -1 ? null : [s, e];
+}
+
 function makeDailyOverview(cfg){
   const P = cfg.prefix;
   const $ = id => document.getElementById(P + '-' + id);
@@ -1418,10 +1431,15 @@ function makeDailyOverview(cfg){
       const ym = D.dates[n-1].slice(0, 7); let s = n - 1;
       for (let i = n - 1; i >= 0; i--){ if (D.dates[i].slice(0,7) === ym) s = i; else break; }
       sI = s;
+    } else if (p === 'lastmonth'){
+      const r = lastMonthRangeOf(D.dates);
+      if (r){ sI = r[0]; eI = r[1]; } else sI = 0;
     } else sI = p === 'all' ? 0 : Math.max(0, n - parseInt(p, 10));
     syncInputs(); renderAll();
   }
   function syncInputs(){
+    const lm = document.querySelector('#' + P + '-presetSeg button[data-preset="lastmonth"]');
+    if (lm){ const ok = !!lastMonthRangeOf(D.dates); lm.disabled = !ok; lm.title = ok ? '' : '저번 달 데이터가 없습니다'; }
     $('startInput').value = D.dates[sI]; $('endInput').value = D.dates[eI];
     document.querySelectorAll('#' + P + '-presetSeg button').forEach(b => b.classList.toggle('active', b.dataset.preset === preset));
   }
