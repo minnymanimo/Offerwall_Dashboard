@@ -403,6 +403,7 @@
   .mw-section-title:first-of-type{margin-top:0;}
   .mw-section-sub{font-size:13.5px;color:var(--text-faint);margin:-12px 0 18px;line-height:1.6;}
 
+  .seg button:disabled{opacity:.35;cursor:not-allowed;}
 </style>
 </head>
 <body>
@@ -473,6 +474,7 @@
       </div>
       <div class="seg" id="mwa-presetSeg">
         <button data-preset="mtd" class="active">이번 달</button>
+        <button data-preset="lastmonth">저번 달</button>
         <button data-preset="1">최근 1일</button>
         <button data-preset="7">7일</button>
         <button data-preset="14">14일</button>
@@ -688,6 +690,17 @@ function renderLifecycle(payload, elId){
 }
 
 
+// '저번 달' = 데이터상 최신 날짜가 속한 달의 바로 전 달(1일~말일). 그 달 데이터가 없으면 null.
+function lastMonthRangeOf(dates){
+  const n = dates.length; if (!n) return null;
+  const [y, m] = dates[n-1].slice(0, 7).split('-').map(Number);
+  const pm = m === 1 ? 12 : m - 1, py = m === 1 ? y - 1 : y;
+  const ym = py + '-' + String(pm).padStart(2, '0');
+  let s = -1, e = -1;
+  for (let i = 0; i < n; i++){ if (dates[i].slice(0, 7) === ym){ if (s === -1) s = i; e = i; } }
+  return s === -1 ? null : [s, e];
+}
+
 const MobwithA = (function(){
 
 const numFmt0 = new Intl.NumberFormat('ko-KR', {maximumFractionDigits:0});
@@ -744,6 +757,9 @@ function applyPreset(preset){
     let s = n - 1;
     for (let i = n - 1; i >= 0; i--){ if (PAYLOAD.dates[i].slice(0,7) === ym) s = i; else break; }
     startIdx = s;
+  } else if (preset === 'lastmonth'){
+    const r = lastMonthRangeOf(PAYLOAD.dates);
+    if (r){ startIdx = r[0]; endIdx = r[1]; } else { startIdx = 0; }
   } else {
     startIdx = (preset === 'all') ? 0 : Math.max(0, n - parseInt(preset, 10));
   }
@@ -753,6 +769,9 @@ function applyPreset(preset){
 }
 
 function syncInputs(){
+  // 저번 달 데이터가 아예 없으면(연동 첫 달) 버튼을 비활성화
+  const lmBtn = document.querySelector('#mwa-presetSeg button[data-preset="lastmonth"]');
+  if (lmBtn){ const ok = !!lastMonthRangeOf(PAYLOAD.dates); lmBtn.disabled = !ok; lmBtn.title = ok ? '' : '저번 달 데이터가 없습니다'; }
   document.getElementById('mwa-startInput').value = PAYLOAD.dates[startIdx];
   document.getElementById('mwa-endInput').value = PAYLOAD.dates[endIdx];
   document.querySelectorAll('#mwa-presetSeg button').forEach(b => {
