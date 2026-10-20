@@ -41,9 +41,9 @@ VENDOR_CONFIG = {
                    'formula': {'type': 'multiply', 'col': 'media_cost', 'factor': 0.8},
                    'unit': 'media_cost × 80%', 'unit_krw': 'media_cost × 80% (원화 환산)', 'currency': 'USD'},
     # ADOP는 계정이 둘이다(2026-09~): 기존 계정 = 점신, 새 계정 = Bidmad. 키(=시트 이름)는 그대로 두고 표시명만 구분.
-    'ADOP':       {'label': 'ADOP(테크랩스 점신)', 'date_col': 'date', 'value_col': 'mediaRevNo', 'group': 'AdNetwork',
+    'ADOP':       {'label': 'ADOP(테크랩스 점신)', 'date_col': 'date', 'value_col': 'mediaRevNo', 'group': 'Rewarded',
                    'unit': 'mediaRevNo', 'unit_krw': 'mediaRevNo (원화 환산)', 'currency': 'USD'},
-    'ADOP_Bidmad': {'label': 'ADOP(테크랩스 Bidmad)', 'date_col': 'date', 'value_col': 'mediaRevNo', 'group': 'AdNetwork',
+    'ADOP_Bidmad': {'label': 'ADOP(테크랩스 Bidmad)', 'date_col': 'date', 'value_col': 'mediaRevNo', 'group': 'Rewarded',
                    'unit': 'mediaRevNo', 'unit_krw': 'mediaRevNo (원화 환산)', 'currency': 'USD'},
     'Mobwith A':  {'label': 'Mobwith (SSP)', 'date_col': '날 짜', 'value_col': '정산금액', 'group': 'AdNetwork',
                    'unit': '정산금액 (원)', 'currency': 'KRW'},
