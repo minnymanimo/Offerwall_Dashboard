@@ -26,6 +26,7 @@
     --c-total:#eceaf4;
     --c-grp-offerwall:#4ade80;
     --c-grp-adnetwork:#38bdf8;
+    --c-grp-rewarded:#fbbf24;
     --up:#5ee6a4;
     --down:#f6789e;
     --mono:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Cascadia Mono','Liberation Mono',monospace;
@@ -101,15 +102,17 @@
   .sh-warn{color:var(--down);}
 
   /* ② 두 사업 */
-  .sum-two{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;}
+  .sum-two{display:grid;grid-template-columns:repeat(var(--grp-cols,2),1fr);gap:12px;margin-bottom:12px;}
   .sum-gcard{background:var(--surface);border:1px solid var(--border);border-radius:14px;
     padding:18px 20px;position:relative;overflow:hidden;}
   .sum-gcard::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;}
   .sum-gcard.is-ow::before{background:var(--c-grp-offerwall);}
   .sum-gcard.is-an::before{background:var(--c-grp-adnetwork);}
+  .sum-gcard.is-rw::before{background:var(--c-grp-rewarded);}
   .sg-label{font-family:var(--mono);font-size:12px;letter-spacing:.06em;margin-bottom:7px;text-transform:uppercase;}
   .sum-gcard.is-ow .sg-label{color:var(--c-grp-offerwall);}
   .sum-gcard.is-an .sg-label{color:var(--c-grp-adnetwork);}
+  .sum-gcard.is-rw .sg-label{color:var(--c-grp-rewarded);}
   .sg-value{font-size:24px;font-weight:700;letter-spacing:-.01em;}
   .sg-meta{font-family:var(--mono);font-size:12.5px;color:var(--text-faint);margin-top:6px;
     display:flex;gap:10px;flex-wrap:wrap;}
@@ -126,6 +129,7 @@
   .sl-grp{flex:none;font-family:var(--mono);font-size:11px;border-radius:4px;padding:1px 6px;letter-spacing:.02em;}
   .sl-grp.is-ow{background:rgba(74,222,128,.15);color:var(--c-grp-offerwall);}
   .sl-grp.is-an{background:rgba(56,189,248,.15);color:var(--c-grp-adnetwork);}
+  .sl-grp.is-rw{background:rgba(251,191,36,.15);color:var(--c-grp-rewarded);}
   .sl-dot{width:9px;height:9px;border-radius:2px;flex:none;}
   .sl-bar{height:7px;background:var(--surface-2);border-radius:4px;overflow:hidden;}
   .sl-bar i{display:block;height:100%;border-radius:4px;}
@@ -265,7 +269,7 @@
     .sl-head div:nth-child(4),.sl-chg{display:none;}
     /* 좁은 화면에선 'ADOP(테크랩스 점신/Bidmad)'처럼 긴 이름이 잘려 구분이 안 되므로 줄바꿈 허용 */
     .sl-vlabel{white-space:normal;line-height:1.35;}
-    .sl-grp{display:none;}  /* 그룹은 위 Offerwall/AdNetwork 카드로 이미 구분됨 — 좁은 화면에선 이름에 자리를 양보 */
+    .sl-grp{display:none;}  /* 그룹은 위 유형 카드(Offerwall/AdNetwork/보상형 광고)로 이미 구분됨 — 좁은 화면에선 이름에 자리를 양보 */
     .chart-box{height:320px;}
     .trend-head{flex-direction:column;}
     header{grid-template-columns:1fr;align-items:start;}
@@ -436,8 +440,13 @@ function selectedVendorKeys(){
   });
   return krwKeys.filter(k => picked.has(k));   // 원래 순서 유지
 }
-const GROUP_LABELS = { Offerwall: 'Offerwall', AdNetwork: 'AdNetwork' };
-const GROUP_ORDER = ['Offerwall', 'AdNetwork'];
+// 유형(분류). 데이터의 vendors[k].group 값 → 표시 이름·CSS 클래스·색.
+// Rewarded(보상형 광고) = ADOP 점신·Bidmad (2026-10 AdNetwork에서 분리)
+const GROUP_LABELS = { Offerwall: 'Offerwall', AdNetwork: 'AdNetwork', Rewarded: '보상형 광고' };
+const GROUP_ORDER = ['Offerwall', 'AdNetwork', 'Rewarded'];
+const GROUP_CLS = { Offerwall: 'is-ow', AdNetwork: 'is-an', Rewarded: 'is-rw' };
+const GROUP_COLOR_VAR = { Offerwall: '--c-grp-offerwall', AdNetwork: '--c-grp-adnetwork', Rewarded: '--c-grp-rewarded' };
+const groupColor = g => getVar(GROUP_COLOR_VAR[g] || '--c-grp-adnetwork');
 
 // 주어진 기간(startStr~endStr)의 '저번 달 같은 날짜' 구간에 해당하는 인덱스 범위를 찾는다.
 // 3/31처럼 저번 달에 없는 날짜는 그 달 마지막 날로 당긴다(2월이면 28/29일).
@@ -518,7 +527,7 @@ function renderKpis(){
     const amt = sumKeys(keys, startIdx, endIdx);
     const share = (total && amt !== null) ? (amt / total * 100) : null;
     const card = document.createElement('div');
-    card.className = 'sum-gcard ' + (g === 'Offerwall' ? 'is-ow' : 'is-an');
+    card.className = 'sum-gcard ' + (GROUP_CLS[g] || 'is-an');
     card.innerHTML =
       `<div class="sg-label">${GROUP_LABELS[g]}</div>` +
       `<div class="sg-value">${amt === null ? '–' : fmt(amt)}</div>` +
@@ -528,6 +537,8 @@ function renderKpis(){
       `</div>`;
     two.appendChild(card);
   });
+  // 유형 수(2~3)에 맞춰 칸 수를 정한다 — 좁은 화면에선 CSS가 1열로 덮어씀
+  two.style.setProperty('--grp-cols', Math.max(1, two.children.length));
   kpiGrid.appendChild(two);
 
   // ③ 업체별 — 카드 대신 막대 있는 순위 목록 (규모 차이가 즉시 보이고 공간도 덜 쓴다)
@@ -544,7 +555,7 @@ function renderKpis(){
         return `<div class="sl-row">` +
           `<div class="sl-name"><span class="sl-dot" style="background:${colorMap[r.key]}"></span>` +
             `<span class="sl-vlabel">${r.label}</span>` +
-            `<span class="sl-grp ${vendors[r.key].group === 'Offerwall' ? 'is-ow' : 'is-an'}">${GROUP_LABELS[vendors[r.key].group]}</span></div>` +
+            `<span class="sl-grp ${GROUP_CLS[vendors[r.key].group] || 'is-an'}">${GROUP_LABELS[vendors[r.key].group] || vendors[r.key].group}</span></div>` +
           `<div class="sl-bar"><i style="width:${Math.max(0, r.amt / maxAmt * 100)}%;background:${colorMap[r.key]}"></i></div>` +
           `<div class="sl-amt">${fmt(r.amt)}</div>` +
           `<div class="sl-chg">${changeHtml(r.amt, [r.key]) || '<span class="sh-dim">–</span>'}</div>` +
@@ -618,7 +629,7 @@ function buildDatasets(){
     const keys = krwKeys.filter(k => vendors[k].group === g);
     if (!keys.length) return;
     datasets.push(aggLine(GROUP_LABELS[g] + ' 합계', key, sumOf(keys),
-      getVar(g === 'Offerwall' ? '--c-grp-offerwall' : '--c-grp-adnetwork'),
+      groupColor(g),
       // 유형별 선은 점선으로는 눈에 잘 안 띈다는 피드백으로 실선으로 바꾼다.
       // 업체 선과 굵기를 맞춰 존재감도 같이 준다.
       {_onCount: keys.length, borderDash: [], borderWidth: 2.4}));
@@ -724,7 +735,7 @@ function renderSeriesToggles(datasets){
     const subHead = document.createElement('div');
     subHead.className = 'chip-group-title chip-subgroup-title';
     subHead.innerHTML = `<span class="cg-bar" style="background:${
-      getVar(g === 'Offerwall' ? '--c-grp-offerwall' : '--c-grp-adnetwork')}"></span>${GROUP_LABELS[g]}`;
+      groupColor(g)}"></span>${GROUP_LABELS[g]}`;
     sub.appendChild(subHead);
     const row = document.createElement('div');
     row.className = 'chip-group-items';
@@ -744,7 +755,7 @@ function renderSeriesToggles(datasets){
     const keys = krwKeys.filter(k => vendors[k].group === g);
     if (!keys.length) return;
     typeChips.push({key: GROUP_KEY_PREFIX + g, label: GROUP_LABELS[g] + ' 합계',
-                    color: getVar(g === 'Offerwall' ? '--c-grp-offerwall' : '--c-grp-adnetwork'),
+                    color: groupColor(g),
                     data: sumSeries(keys), aggregate: true,
                     metaText: keys.length + '곳'});
   });
