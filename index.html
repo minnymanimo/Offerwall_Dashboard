@@ -21,6 +21,7 @@
     --c-apcorn:#f6b860;
     --c-adop:#f6789e;
     --c-adop-bidmad:#e879f9;
+    --c-adop-blomics:#fb923c;
     --c-mobwith-a:#60a5fa;
     --c-adpopcorn-ofw:#a3e635;
     --c-total:#eceaf4;
@@ -373,8 +374,8 @@
     <div class="notes-title">데이터 참고 사항</div>
     <ul>
       <li><b>중복 날짜 자동 정리</b> — 같은 날짜가 여러 행으로 기록된 경우 자동으로 1건으로 정리해 집계합니다.</li>
-      <li><b>매출 컬럼 부재</b> — APCORN_SSP·ADOP(점신·Bidmad) 시트는 별도 '매출' 컬럼이 없어 media_cost / mediaRevNo 값을 사용합니다. 매출/비용 여부는 원본 기준 확인이 필요합니다.</li>
-      <li><b>USD→KRW 환산</b> — APCORN_SSP·ADOP(점신·Bidmad)는 원본이 USD라, 각 날짜의 Frankfurter(ECB 기준) 당일 환율로 원화 환산해 표시합니다. 주말·공휴일처럼 환율이 발표되지 않는 날은 직전 영업일 환율을 사용합니다. 카드의 작은 글씨가 환산에 쓰인 원본 USD 값과 환율입니다.</li>
+      <li><b>매출 컬럼 부재</b> — APCORN_SSP·ADOP(점신·Bidmad·Blomics) 시트는 별도 '매출' 컬럼이 없어 media_cost / mediaRevNo 값을 사용합니다. 매출/비용 여부는 원본 기준 확인이 필요합니다.</li>
+      <li><b>USD→KRW 환산</b> — APCORN_SSP·ADOP(점신·Bidmad·Blomics)는 원본이 USD라, 각 날짜의 Frankfurter(ECB 기준) 당일 환율로 원화 환산해 표시합니다. 주말·공휴일처럼 환율이 발표되지 않는 날은 직전 영업일 환율을 사용합니다. 카드의 작은 글씨가 환산에 쓰인 원본 USD 값과 환율입니다.</li>
       <li><b>벤더 간 규모 차이</b> — NBT 애디슨이 다른 벤더보다 매출 규모가 훨씬 커서, 선형 축에서는 나머지 벤더의 추이가 눌려 보입니다. 작은 벤더의 증감을 볼 때는 <b>로그</b> 축으로 전환하거나 차트 아래 토글에서 NBT·합계를 잠시 꺼 두세요.</li>
       <li><b>합계 선</b> — 현재 켜져 있는 항목만 더한 값입니다. 항목을 끄면 합계도 다시 계산되고, 켜진 항목이 1개 이하일 때는 그 항목과 겹치므로 합계를 표시하지 않습니다.</li>
       <li><b>칩의 합계와 일수</b> — 각 항목 칩에 선택 기간의 합계 금액과, 실제로 데이터가 있는 일수를 함께 표시합니다. 벤더마다 수집 시작일이 달라(예: Mobwith A는 8/1부터) 금액만으로 규모를 비교하면 오해할 수 있기 때문입니다.</li>
@@ -406,6 +407,7 @@ const colorMap = {
   APCORN_SSP: getVar('--c-apcorn'),
   ADOP: getVar('--c-adop'),
   ADOP_Bidmad: getVar('--c-adop-bidmad'),
+  ADOP_Blomics: getVar('--c-adop-blomics'),
   'Mobwith A': getVar('--c-mobwith-a'),
   ADPOPCORN_Offerwall: getVar('--c-adpopcorn-ofw'),
 };
@@ -441,7 +443,7 @@ function selectedVendorKeys(){
   return krwKeys.filter(k => picked.has(k));   // 원래 순서 유지
 }
 // 유형(분류). 데이터의 vendors[k].group 값 → 표시 이름·CSS 클래스·색.
-// Rewarded(보상형 광고) = ADOP 점신·Bidmad (2026-10 AdNetwork에서 분리)
+// Rewarded(보상형 광고) = ADOP 점신·Bidmad·Blomics (2026-10 AdNetwork에서 분리)
 const GROUP_LABELS = { Offerwall: 'Offerwall', AdNetwork: 'AdNetwork', Rewarded: '보상형 광고' };
 const GROUP_ORDER = ['Offerwall', 'AdNetwork', 'Rewarded'];
 const GROUP_CLS = { Offerwall: 'is-ow', AdNetwork: 'is-an', Rewarded: 'is-rw' };
