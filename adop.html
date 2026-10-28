@@ -429,11 +429,11 @@
     <div>
       <div class="eyebrow">ADOP · Techlabs · Placement</div>
       <h1>ADOP 지면별 현황</h1>
-      <div class="subtitle">점신 · Bidmad 두 계정의 지면(unitName) 단위 일별 지표 &nbsp;|&nbsp; <b id="ad-dateRange">–</b></div>
+      <div class="subtitle">ADOP 계정별(점신 · Bidmad · Blomics) 지면(unitName) 단위 일별 지표 &nbsp;|&nbsp; <b id="ad-dateRange">–</b></div>
     </div>
     <div>
       <div class="meta-box">
-        원본: ADOP_raw + ADOP_Bidmad_raw<span class="pill">Live</span><br/>
+        원본: ADOP 계정별 raw 탭<span class="pill">Live</span><br/>
         생성 시각: <span id="ad-generatedAt">–</span>
       </div>
       <div class="refresh-row">
@@ -456,7 +456,7 @@
 
 
   <div class="mw-section-title">ADOP · 일별 지표</div>
-  <div class="mw-section-sub">점신·Bidmad 두 계정의 전체 지면·전체 네트워크를 더한 날짜별 지표입니다. 기간은 아래 지면별 히트맵과 별개로 선택합니다.</div>
+  <div class="mw-section-sub">모든 계정의 전체 지면·전체 네트워크를 더한 날짜별 지표입니다. 기간은 아래 지면별 히트맵과 별개로 선택합니다.</div>
 
   <div class="split-card">
     <div class="split-label">정산금액 <span class="split-period" id="add-splitPeriod">–</span></div>
@@ -544,6 +544,7 @@
         <button data-acc="all" class="active">전체</button>
         <button data-acc="점신">점신</button>
         <button data-acc="Bidmad">Bidmad</button>
+        <button data-acc="Blomics">Blomics</button>
       </div>
     </div>
     <table class="heat" id="ad-heatTable"></table>
@@ -557,6 +558,7 @@
         <button data-acc="all" class="active">전체</button>
         <button data-acc="점신">점신</button>
         <button data-acc="Bidmad">Bidmad</button>
+        <button data-acc="Blomics">Blomics</button>
       </div>
     </div>
     <div class="legend-row">
@@ -1276,7 +1278,7 @@ function renderDataChecks(payload){
   const failed = (payload.accounts || []).filter(a => payload.loaded && payload.loaded[a] === false);
   if (failed.length){
     warn.style.display = '';
-    warn.textContent = '⚠ ' + failed.join(' · ') + ' 원본 탭을 읽지 못해 이 계정은 목록에서 빠져 있습니다. 시트 이름(ADOP_raw / ADOP_Bidmad_raw)과 헤더를 확인해주세요.';
+    warn.textContent = '⚠ ' + failed.join(' · ') + ' 원본 탭을 읽지 못해 이 계정은 목록에서 빠져 있습니다. 시트 이름(ADOP_raw / ADOP_Bidmad_raw / ADOP_Blomics_raw)과 헤더를 확인해주세요.';
   } else {
     warn.style.display = 'none';
   }
@@ -1307,6 +1309,19 @@ function initPage(payload){
   DATA = payload;
   MONEY_IS_USD = payload.fxAvailable === false;
   renderDataChecks(payload);
+  // 계정 버튼은 데이터에 있는 계정만 보인다 (예: Blomics는 연동 후 데이터가 생겨야 나타남).
+  // 지금 고른 계정이 사라졌으면 '전체'로 되돌린다.
+  const accs = payload.accounts || [];
+  ['#ad-accSegHeat', '#ad-accSegScatter'].forEach(sel => {
+    document.querySelectorAll(sel + ' button').forEach(b => {
+      b.style.display = (b.dataset.acc === 'all' || accs.includes(b.dataset.acc)) ? '' : 'none';
+    });
+  });
+  // (그리기는 아래 applyPreset에서 한 번에 한다)
+  if (accHeat !== 'all' && !accs.includes(accHeat)) accHeat = 'all';
+  if (accScatter !== 'all' && !accs.includes(accScatter)) accScatter = 'all';
+  document.querySelectorAll('#ad-accSegHeat button').forEach(b => b.classList.toggle('active', b.dataset.acc === accHeat));
+  document.querySelectorAll('#ad-accSegScatter button').forEach(b => b.classList.toggle('active', b.dataset.acc === accScatter));
   if (!payload.dates || !payload.dates.length){
     document.getElementById('ad-heatTable').innerHTML =
       '<tbody><tr><td style="padding:16px;color:var(--text-dim);">표시할 데이터가 없습니다.</td></tr></tbody>';
@@ -1630,6 +1645,7 @@ const AdDaily = makeDailyOverview({
   groups: [
     {key: '점신', label: '점신', color: '#f6789e'},
     {key: 'Bidmad', label: 'Bidmad', color: '#e879f9'},
+    {key: 'Blomics', label: 'Blomics', color: '#fb923c'},
   ],
   moneyFmt: () => fmtMoneyPlain && (v => v == null ? '–' : fmtMoneyPlain(v)),
 });
