@@ -3,11 +3,11 @@
 오퍼월 광고 매출 대시보드 — 데이터 갱신 스크립트 (GitHub Actions에서 실행)
 
 세 개의 JSON을 만듭니다:
-- data.json      : 벤더 통합 일별 매출 (NBT_Adison, Buzzvil, APCORN_SSP, ADOP 점신·Bidmad·Blomics, Mobwith_A, ...)
+- data.json      : 벤더 통합 일별 매출 (NBT_Adison, Buzzvil, APCORN_SSP, ADOP 점신·Bidmad·Blomics·아바티, Mobwith_A, ...)
 - mobwith-a.json  : Mobwith A 일별 상세 지표(노출수/클릭수/CTR/CPC/정산금액/eCPM)
 - mobwith-b.json  : Mobwith B 지면별 스냅샷(노출수/클릭수/CTR/CPC/정산금액/eCPM)
 - apcorn-ssp.json : APCORN SSP 지면별 일별 지표
-- adop.json       : ADOP(테크랩스) 지면별 일별 지표 — 점신(ADOP_raw) + Bidmad(ADOP_Bidmad_raw) + Blomics(ADOP_Blomics_raw)
+- adop.json       : ADOP(테크랩스) 지면별 일별 지표 — 점신(ADOP_raw) + Bidmad(ADOP_Bidmad_raw) + Blomics(ADOP_Blomics_raw) + 아바티(ADOP_Avatye_raw)
 
 구글시트를 gviz 엔드포인트로 읽어옵니다. 읽는 방식은 두 가지이며 자동으로 고릅니다.
 
@@ -53,6 +53,9 @@ VENDOR_CONFIG = {
     # 세 번째 계정(2026-10~). optional: 시트 탭이 아직 없거나 비어 있으면 대시보드에서 조용히 빠진다
     # (연동 초기에 탭이 생기기 전 갱신이 돌아도 전체가 실패하지 않도록).
     'ADOP_Blomics': {'label': 'ADOP(테크랩스 Blomics)', 'date_col': 'date', 'value_col': 'mediaRevNo', 'group': 'Rewarded',
+                   'unit': 'mediaRevNo', 'unit_krw': 'mediaRevNo (원화 환산)', 'currency': 'USD', 'optional': True},
+    # 네 번째 계정 아바티(Avatye, 2026-10~). Blomics와 같은 optional 처리.
+    'ADOP_Avatye': {'label': 'ADOP(테크랩스 아바티)', 'date_col': 'date', 'value_col': 'mediaRevNo', 'group': 'Rewarded',
                    'unit': 'mediaRevNo', 'unit_krw': 'mediaRevNo (원화 환산)', 'currency': 'USD', 'optional': True},
     'Mobwith A':  {'label': 'Mobwith (SSP)', 'date_col': '날 짜', 'value_col': '정산금액', 'group': 'AdNetwork',
                    'unit': '정산금액 (원)', 'currency': 'KRW'},
@@ -1026,6 +1029,7 @@ ADOP_ACCOUNTS = [
     {'account': 'Bidmad', 'raw': 'ADOP_Bidmad_raw', 'summary': 'ADOP_Bidmad'},
     # optional: 탭이 아직 없으면 계정 목록에서 빼고 '읽기 실패' 경고도 띄우지 않는다
     {'account': 'Blomics', 'raw': 'ADOP_Blomics_raw', 'summary': 'ADOP_Blomics', 'optional': True},
+    {'account': '아바티',  'raw': 'ADOP_Avatye_raw',  'summary': 'ADOP_Avatye',  'optional': True},
 ]
 ADOP_RAW_SPEC = {
     'date':       ['date'],          # Bidmad raw에만 있음 (스크립트가 넣는 기준일)
@@ -1093,7 +1097,7 @@ def build_adop_payload(fetch_fn=None, fetch_fx_fn=None, summary_fn=None):
     - 정산금액(mediaRevNo)은 USD라 APCORN과 똑같이 당일 환율로 원화 환산한다.
     - 네트워크(netComName)는 합쳐버리지 않고 지면 안에 byNet으로 따로 들고 있다가
       화면에서 네트워크 필터로 골라 볼 수 있게 한다.
-    - 요약 탭(ADOP / ADOP_Bidmad / ADOP_Blomics) 날짜별 합계와 raw 합계를 대조해서 어긋난 날을 남긴다."""
+    - 요약 탭(ADOP / ADOP_Bidmad / ADOP_Blomics / ADOP_Avatye) 날짜별 합계와 raw 합계를 대조해서 어긋난 날을 남긴다."""
     fetch_fx_fn = fetch_fx_fn or fetch_usd_krw_rates
     summary_fn = summary_fn or (lambda sheet: read_vendor_series(sheet, 'date', 'mediaRevNo'))
 
