@@ -429,7 +429,7 @@
     <div>
       <div class="eyebrow">ADOP · Techlabs · Placement</div>
       <h1>ADOP 지면별 현황</h1>
-      <div class="subtitle">ADOP 계정별(점신 · Bidmad · Blomics) 지면(unitName) 단위 일별 지표 &nbsp;|&nbsp; <b id="ad-dateRange">–</b></div>
+      <div class="subtitle">ADOP 계정별(점신 · Bidmad · Blomics · 아바티) 지면(unitName) 단위 일별 지표 &nbsp;|&nbsp; <b id="ad-dateRange">–</b></div>
     </div>
     <div>
       <div class="meta-box">
@@ -545,6 +545,7 @@
         <button data-acc="점신">점신</button>
         <button data-acc="Bidmad">Bidmad</button>
         <button data-acc="Blomics">Blomics</button>
+        <button data-acc="아바티">아바티</button>
       </div>
     </div>
     <table class="heat" id="ad-heatTable"></table>
@@ -559,6 +560,7 @@
         <button data-acc="점신">점신</button>
         <button data-acc="Bidmad">Bidmad</button>
         <button data-acc="Blomics">Blomics</button>
+        <button data-acc="아바티">아바티</button>
       </div>
     </div>
     <div class="legend-row">
@@ -1278,7 +1280,7 @@ function renderDataChecks(payload){
   const failed = (payload.accounts || []).filter(a => payload.loaded && payload.loaded[a] === false);
   if (failed.length){
     warn.style.display = '';
-    warn.textContent = '⚠ ' + failed.join(' · ') + ' 원본 탭을 읽지 못해 이 계정은 목록에서 빠져 있습니다. 시트 이름(ADOP_raw / ADOP_Bidmad_raw / ADOP_Blomics_raw)과 헤더를 확인해주세요.';
+    warn.textContent = '⚠ ' + failed.join(' · ') + ' 원본 탭을 읽지 못해 이 계정은 목록에서 빠져 있습니다. 시트 이름(ADOP_raw / ADOP_Bidmad_raw / ADOP_Blomics_raw / ADOP_Avatye_raw)과 헤더를 확인해주세요.';
   } else {
     warn.style.display = 'none';
   }
@@ -1646,6 +1648,7 @@ const AdDaily = makeDailyOverview({
     {key: '점신', label: '점신', color: '#f6789e'},
     {key: 'Bidmad', label: 'Bidmad', color: '#e879f9'},
     {key: 'Blomics', label: 'Blomics', color: '#fb923c'},
+    {key: '아바티', label: '아바티', color: '#c084fc'},
   ],
   moneyFmt: () => fmtMoneyPlain && (v => v == null ? '–' : fmtMoneyPlain(v)),
 });
