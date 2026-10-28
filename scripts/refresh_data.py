@@ -3,22 +3,27 @@
 오퍼월 광고 매출 대시보드 — 데이터 갱신 스크립트 (GitHub Actions에서 실행)
 
 세 개의 JSON을 만듭니다:
-- data.json      : 벤더 통합 일별 매출 (NBT_Adison, Buzzvil, APCORN_SSP, ADOP 점신, ADOP Bidmad, Mobwith_A, ...)
+- data.json      : 벤더 통합 일별 매출 (NBT_Adison, Buzzvil, APCORN_SSP, ADOP 점신·Bidmad·Blomics, Mobwith_A, ...)
 - mobwith-a.json  : Mobwith A 일별 상세 지표(노출수/클릭수/CTR/CPC/정산금액/eCPM)
 - mobwith-b.json  : Mobwith B 지면별 스냅샷(노출수/클릭수/CTR/CPC/정산금액/eCPM)
 - apcorn-ssp.json : APCORN SSP 지면별 일별 지표
-- adop.json       : ADOP(테크랩스) 지면별 일별 지표 — 점신(ADOP_raw) + Bidmad(ADOP_Bidmad_raw)
+- adop.json       : ADOP(테크랩스) 지면별 일별 지표 — 점신(ADOP_raw) + Bidmad(ADOP_Bidmad_raw) + Blomics(ADOP_Blomics_raw)
 
-구글시트를 공개 gviz 엔드포인트로 읽어옵니다.
+구글시트를 gviz 엔드포인트로 읽어옵니다. 읽는 방식은 두 가지이며 자동으로 고릅니다.
 
-전제조건: 이 스프레드시트가 "링크가 있는 모든 사용자: 뷰어"로 공유되어 있어야 합니다
-(gviz 엔드포인트는 인증 없이 호출되므로, 시트 자체가 링크 공개 상태가 아니면 빈 결과가 옵니다).
+1) 서비스 계정 인증 (권장) — 환경변수 GOOGLE_SERVICE_ACCOUNT_JSON 에 서비스 계정
+   키(JSON 전체)가 들어 있으면, 그 계정으로 로그인한 상태로 시트를 읽습니다.
+   이때 시트는 '링크 공개'를 끄고 서비스 계정 이메일에만 '뷰어'로 공유하면 됩니다.
+   (GitHub Actions에서는 저장소 Secrets에 같은 이름으로 넣고 워크플로에서 넘겨줍니다.)
+2) 공개 링크 (예전 방식) — 위 환경변수가 없으면 인증 없이 읽습니다. 이 경우 시트가
+   "링크가 있는 모든 사용자: 뷰어"로 공유되어 있어야 합니다.
 
 ADPOPCORN_SSP 탭은 APCORN_SSP와 값이 중복되는 레거시 탭으로 판단되어 제외했습니다.
 APCORN_SSP(media_cost)·ADOP(mediaRevNo)는 원본이 USD라, Frankfurter(ECB 기준) 당일
 환율로 원화 환산합니다. 환율 조회가 실패하면 자동으로 USD 원본 표시로 폴백합니다.
 """
 import json
+import os
 import re
 import urllib.request
 import urllib.parse
@@ -45,6 +50,10 @@ VENDOR_CONFIG = {
                    'unit': 'mediaRevNo', 'unit_krw': 'mediaRevNo (원화 환산)', 'currency': 'USD'},
     'ADOP_Bidmad': {'label': 'ADOP(테크랩스 Bidmad)', 'date_col': 'date', 'value_col': 'mediaRevNo', 'group': 'Rewarded',
                    'unit': 'mediaRevNo', 'unit_krw': 'mediaRevNo (원화 환산)', 'currency': 'USD'},
+    # 세 번째 계정(2026-10~). optional: 시트 탭이 아직 없거나 비어 있으면 대시보드에서 조용히 빠진다
+    # (연동 초기에 탭이 생기기 전 갱신이 돌아도 전체가 실패하지 않도록).
+    'ADOP_Blomics': {'label': 'ADOP(테크랩스 Blomics)', 'date_col': 'date', 'value_col': 'mediaRevNo', 'group': 'Rewarded',
+                   'unit': 'mediaRevNo', 'unit_krw': 'mediaRevNo (원화 환산)', 'currency': 'USD', 'optional': True},
     'Mobwith A':  {'label': 'Mobwith (SSP)', 'date_col': '날 짜', 'value_col': '정산금액', 'group': 'AdNetwork',
                    'unit': '정산금액 (원)', 'currency': 'KRW'},
     'ADPOPCORN_Offerwall': {'label': 'ADPOPCORN 오퍼월', 'date_col': 'date', 'group': 'Offerwall',
@@ -72,13 +81,46 @@ RECONCILE_TOLERANCE = 5.0
 GVIZ_RESPONSE_RE = re.compile(r'^[^(]*\((.*)\);?\s*$', re.DOTALL)
 
 
-def http_get(url, timeout=30):
-    req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+def http_get(url, timeout=30, headers=None):
+    h = {'User-Agent': 'Mozilla/5.0'}
+    if headers:
+        h.update(headers)
+    req = urllib.request.Request(url, headers=h)
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         return resp.read().decode('utf-8')
 
 
 _SHEET_CACHE = {}
+_TOKEN = {'value': None, 'tried': False}
+SERVICE_ACCOUNT_ENV = 'GOOGLE_SERVICE_ACCOUNT_JSON'
+
+
+def google_access_token():
+    """서비스 계정 키가 환경변수에 있으면 구글 접근 토큰을 받아 돌려준다(없으면 None).
+
+    한 번 실행에 1시간 넘게 걸리지 않으므로 토큰은 처음 한 번만 받는다.
+    google-auth 패키지가 필요하다 (워크플로에서 pip install google-auth requests)."""
+    if _TOKEN['tried']:
+        return _TOKEN['value']
+    _TOKEN['tried'] = True
+    raw = os.environ.get(SERVICE_ACCOUNT_ENV, '').strip()
+    if not raw:
+        return None
+    try:
+        info = json.loads(raw)
+    except ValueError:
+        raise RuntimeError('%s 값이 올바른 JSON이 아닙니다. 서비스 계정 키 파일 내용을 '
+                           '그대로(중괄호 포함 전체) 넣었는지 확인하세요.' % SERVICE_ACCOUNT_ENV)
+    from google.oauth2 import service_account
+    import google.auth.transport.requests
+    creds = service_account.Credentials.from_service_account_info(info, scopes=[
+        'https://www.googleapis.com/auth/spreadsheets.readonly',
+        'https://www.googleapis.com/auth/drive.readonly',
+    ])
+    creds.refresh(google.auth.transport.requests.Request())
+    _TOKEN['value'] = creds.token
+    print('  · 구글 시트: 서비스 계정(%s)으로 읽습니다' % info.get('client_email', '?'))
+    return _TOKEN['value']
 
 
 def fetch_sheet_rows(sheet_name):
@@ -92,9 +134,18 @@ def fetch_sheet_rows(sheet_name):
     url = ('https://docs.google.com/spreadsheets/d/{}/gviz/tq?'
            'tqx=out:json&headers=1&sheet={}').format(
         SPREADSHEET_ID, urllib.parse.quote(sheet_name))
-    raw = http_get(url)
+    token = google_access_token()
+    raw = http_get(url, headers={'Authorization': 'Bearer ' + token} if token else None)
     m = GVIZ_RESPONSE_RE.match(raw)
     if not m:
+        if '<html' in raw[:500].lower():
+            # 비공개 시트를 권한 없이 읽으면 JSON 대신 로그인 화면(HTML)이 온다
+            raise RuntimeError(
+                '시트 "%s"를 읽을 권한이 없습니다. %s'
+                % (sheet_name,
+                   '서비스 계정 이메일이 시트에 뷰어로 공유되어 있는지 확인하세요.' if token else
+                   '시트 링크 공개를 껐다면 GitHub Secrets에 %s를 등록하고 워크플로에서 넘겨주세요.'
+                   % SERVICE_ACCOUNT_ENV))
         raise RuntimeError('시트 "%s"에서 예상치 못한 gviz 응답 형식' % sheet_name)
     payload = json.loads(m.group(1))
     table = payload.get('table', {})
@@ -581,7 +632,17 @@ def build_payload(fetch_sheet_fn=read_vendor_series_for_vendor, fetch_fx_fn=fetc
 
     raw_by_vendor, all_dates = {}, set()
     for key, cfg in VENDOR_CONFIG.items():
-        by_date = fetch_sheet_fn(key, cfg)
+        if cfg.get('optional'):
+            try:
+                by_date = fetch_sheet_fn(key, cfg)
+            except Exception as e:
+                print('  · %s: 아직 데이터 없음(탭 없음 또는 읽기 실패) — 이번 갱신에서 제외 (%s)' % (key, e))
+                continue
+            if not by_date:
+                print('  · %s: 아직 데이터 없음 — 이번 갱신에서 제외' % key)
+                continue
+        else:
+            by_date = fetch_sheet_fn(key, cfg)
         raw_by_vendor[key] = by_date
         all_dates.update(by_date.keys())
 
@@ -591,13 +652,15 @@ def build_payload(fetch_sheet_fn=read_vendor_series_for_vendor, fetch_fx_fn=fetc
 
     dates = build_date_range(date_keys[0], date_keys[-1])
 
-    needs_fx = any(cfg['currency'] == 'USD' for cfg in VENDOR_CONFIG.values())
+    needs_fx = any(VENDOR_CONFIG[k]['currency'] == 'USD' for k in raw_by_vendor)
     raw_rates = fetch_fx_fn(dates[0], dates[-1]) if needs_fx else {}
     fx_available = bool(raw_rates)
     rate_by_date = fill_rate_series(dates, raw_rates) if fx_available else {}
 
     vendors = {}
     for key, cfg in VENDOR_CONFIG.items():
+        if key not in raw_by_vendor:   # optional 벤더가 아직 데이터 없음
+            continue
         by_date = raw_by_vendor[key]
         arr_raw = [by_date.get(d) for d in dates]
         is_usd = cfg['currency'] == 'USD'
@@ -961,6 +1024,8 @@ def report_lifecycle(sheet_name, lifecycle, payload):
 ADOP_ACCOUNTS = [
     {'account': '점신',   'raw': 'ADOP_raw',        'summary': 'ADOP'},
     {'account': 'Bidmad', 'raw': 'ADOP_Bidmad_raw', 'summary': 'ADOP_Bidmad'},
+    # optional: 탭이 아직 없으면 계정 목록에서 빼고 '읽기 실패' 경고도 띄우지 않는다
+    {'account': 'Blomics', 'raw': 'ADOP_Blomics_raw', 'summary': 'ADOP_Blomics', 'optional': True},
 ]
 ADOP_RAW_SPEC = {
     'date':       ['date'],          # Bidmad raw에만 있음 (스크립트가 넣는 기준일)
@@ -1028,17 +1093,20 @@ def build_adop_payload(fetch_fn=None, fetch_fx_fn=None, summary_fn=None):
     - 정산금액(mediaRevNo)은 USD라 APCORN과 똑같이 당일 환율로 원화 환산한다.
     - 네트워크(netComName)는 합쳐버리지 않고 지면 안에 byNet으로 따로 들고 있다가
       화면에서 네트워크 필터로 골라 볼 수 있게 한다.
-    - 요약 탭(ADOP / ADOP_Bidmad) 날짜별 합계와 raw 합계를 대조해서 어긋난 날을 남긴다."""
+    - 요약 탭(ADOP / ADOP_Bidmad / ADOP_Blomics) 날짜별 합계와 raw 합계를 대조해서 어긋난 날을 남긴다."""
     fetch_fx_fn = fetch_fx_fn or fetch_usd_krw_rates
     summary_fn = summary_fn or (lambda sheet: read_vendor_series(sheet, 'date', 'mediaRevNo'))
 
-    all_rows, loaded, dup_total = [], {}, 0
+    all_rows, loaded, dup_total, active_accounts = [], {}, 0, []
     for src in ADOP_ACCOUNTS:
         try:
             rows, dups = _adop_rows(src['raw'], fetch_fn=fetch_fn)
         except Exception as e:  # 한 계정 탭을 못 읽어도 나머지 계정은 보여준다
-            print('  ! %s 읽기 실패: %s' % (src['raw'], e))
+            print('  %s %s 읽기 실패: %s' % ('·' if src.get('optional') else '!', src['raw'], e))
             rows, dups = [], 0
+        if src.get('optional') and not rows:
+            continue   # 아직 연동 전인 계정 — 화면에 나타나지 않게
+        active_accounts.append(src['account'])
         loaded[src['account']] = bool(rows)
         dup_total += dups
         for r in rows:
@@ -1046,7 +1114,7 @@ def build_adop_payload(fetch_fn=None, fetch_fx_fn=None, summary_fn=None):
         all_rows.extend(rows)
 
     if not all_rows:
-        return {'dates': [], 'accounts': [a['account'] for a in ADOP_ACCOUNTS], 'networks': [],
+        return {'dates': [], 'accounts': active_accounts, 'networks': [],
                 'placements': [], 'reconcile': [], 'duplicateRows': dup_total,
                 'loaded': loaded, 'fxAvailable': False, 'generatedAt': now_str()}
 
@@ -1106,7 +1174,7 @@ def build_adop_payload(fetch_fn=None, fetch_fx_fn=None, summary_fn=None):
                                   'raw': None if r_v is None else round(r_v, 2),
                                   'diff': round((r_v or 0) - (s_v or 0), 2)})
 
-    return {'dates': dates, 'accounts': [a['account'] for a in ADOP_ACCOUNTS],
+    return {'dates': dates, 'accounts': active_accounts,
             'networks': networks, 'placements': placements, 'reconcile': reconcile,
             'duplicateRows': dup_total, 'loaded': loaded,
             'fxAvailable': fx_available, 'generatedAt': now_str()}
