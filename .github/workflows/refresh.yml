@@ -20,7 +20,15 @@ jobs:
         with:
           python-version: '3.12'
 
+      # 구글 서비스 계정으로 시트를 읽을 때 필요한 패키지 (시트 비공개 대응)
+      - name: Install packages
+        run: pip install google-auth requests
+
       - name: Fetch sheet data and rebuild data.json / mobwith-a.json / mobwith-b.json
+        env:
+          # GitHub Settings > Secrets and variables > Actions 에 등록한 서비스 계정 키.
+          # 아직 등록 전이면 빈 값이 들어가고, 그 경우 예전처럼 공개 링크로 읽는다.
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
         run: python scripts/refresh_data.py
 
       - name: Commit updated JSON files (변경된 경우에만)
