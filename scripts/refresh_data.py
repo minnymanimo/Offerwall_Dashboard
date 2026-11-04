@@ -23,6 +23,7 @@ APCORN_SSP(media_cost)·ADOP(mediaRevNo)는 원본이 USD라, Frankfurter(ECB �
 환율로 원화 환산합니다. 환율 조회가 실패하면 자동으로 USD 원본 표시로 폴백합니다.
 """
 import json
+import time
 import os
 import re
 import urllib.request
@@ -602,18 +603,94 @@ def find_gaps(arr):
     return gaps
 
 
-def fetch_usd_krw_rates(start_s, end_s):
-    url = 'https://api.frankfurter.dev/v1/%s..%s?base=%s&symbols=%s' % (
-        start_s, end_s, FX_BASE, FX_QUOTE)
+# ---------------------------------------------------------------------------
+# 환율 (USD→KRW, ECB 기준 · Frankfurter)
+#  - 한 번 받은 환율은 data.json의 fxRates에 저장해 두고(FX_CACHE_FILE), 다음 실행 때 다시 쓴다.
+#  - API는 1년 단위로 나눠 요청하고, 실패하면 3번까지 다시 시도한다.
+#  - 그래도 실패하면 저장된 환율로 계산한다(저장본 이후 날짜는 마지막 환율을 이어 씀).
+#    → 환율 사이트가 잠깐 멈춰도 USD 매체가 대시보드에서 빠지지 않는다.
+#  - 한 번의 실행에서 세 번(data/apcorn/adop) 부르므로 결과를 메모리에 모아 재사용한다.
+# ---------------------------------------------------------------------------
+FX_CACHE_FILE = 'data.json'          # 이전 실행이 남긴 fxRates를 여기서 읽는다
+_FX_KNOWN = {}                       # 날짜 → 환율 (이번 실행에서 받은 것 + 저장본)
+_FX_FETCHED = set()                  # 이번 실행에서 API로 받아 본 (연도 구간) 키
+FX_STATUS = {'source': None, 'failedRanges': []}   # 'api' | 'cache' | None
+
+
+def _load_fx_cache():
+    if _FX_KNOWN.get('__loaded__'):
+        return
+    _FX_KNOWN['__loaded__'] = True
     try:
-        data = json.loads(http_get(url, timeout=20))
-        rates = {}
-        for d, obj in (data.get('rates') or {}).items():
-            if isinstance(obj, dict) and isinstance(obj.get(FX_QUOTE), (int, float)):
-                rates[d] = obj[FX_QUOTE]
-        return rates
+        with open(FX_CACHE_FILE, encoding='utf-8') as f:
+            saved = (json.load(f) or {}).get('fxRates') or {}
+        for d, v in saved.items():
+            if isinstance(v, (int, float)) and v > 0:
+                _FX_KNOWN.setdefault(d, v)
     except Exception:
-        return {}
+        pass
+
+
+def _fetch_fx_range_api(a, b, tries=3):
+    url = 'https://api.frankfurter.dev/v1/%s..%s?base=%s&symbols=%s' % (a, b, FX_BASE, FX_QUOTE)
+    last_err = None
+    for t in range(tries):
+        try:
+            data = json.loads(http_get(url, timeout=40))
+            out = {}
+            for d, obj in (data.get('rates') or {}).items():
+                if isinstance(obj, dict) and isinstance(obj.get(FX_QUOTE), (int, float)):
+                    out[d] = obj[FX_QUOTE]
+            if out:
+                return out
+            last_err = 'empty response'
+        except Exception as e:
+            last_err = e
+        time.sleep(2 * (t + 1))
+    print('  ! 환율 조회 실패 %s..%s: %s' % (a, b, last_err))
+    return None
+
+
+def fetch_usd_krw_rates(start_s, end_s):
+    """start~end 구간의 {날짜: 환율}. API 실패 시 저장본으로 대체(없으면 {})."""
+    _load_fx_cache()
+    y0, y1 = int(start_s[:4]), int(end_s[:4])
+    for y in range(y0, y1 + 1):
+        a = max(start_s, '%d-01-01' % y)
+        b = min(end_s, '%d-12-31' % y)
+        key = (a[:4], a, b)
+        if key in _FX_FETCHED:
+            continue
+        # 저장본이 그 해를 이미 끝까지 덮고(과거 연도) 있으면 다시 받을 필요 없음
+        if y < int(now_str()[:4]) and any(d.startswith(str(y)) and d >= b[:7] for d in _FX_KNOWN if d != '__loaded__'):
+            _FX_FETCHED.add(key)
+            continue
+        got = _fetch_fx_range_api(a, b)
+        _FX_FETCHED.add(key)
+        if got:
+            _FX_KNOWN.update(got)
+            if FX_STATUS['source'] is None:
+                FX_STATUS['source'] = 'api'
+        else:
+            FX_STATUS['failedRanges'].append('%s..%s' % (a, b))
+    rates = {d: v for d, v in _FX_KNOWN.items() if d != '__loaded__' and start_s <= d <= end_s}
+    # 앞 기간 환율이 저장돼 있으면 구간 시작 전 마지막 환율도 넘겨서 이어쓰기에 쓰게 한다
+    if rates or any(d != '__loaded__' for d in _FX_KNOWN):
+        prev = [d for d in _FX_KNOWN if d != '__loaded__' and d < start_s]
+        if prev and start_s not in rates:
+            rates.setdefault(start_s, _FX_KNOWN[max(prev)])
+    if FX_STATUS['failedRanges'] and rates:
+        FX_STATUS['source'] = 'cache'
+    return rates
+
+
+def fx_note():
+    """API 일부/전체 실패로 저장된 환율을 쓴 경우 화면에 띄울 안내 (정상이면 None)."""
+    if FX_STATUS['source'] != 'cache':
+        return None
+    known = sorted(d for d in _FX_KNOWN if d != '__loaded__')
+    return ('환율 사이트 응답이 없어 저장된 환율(%s까지)로 원화 환산했습니다. 이후 날짜는 마지막 환율을 이어서 씁니다.'
+            % (known[-1] if known else '-'))
 
 
 def fill_rate_series(dates, rate_map):
@@ -706,8 +783,10 @@ def build_payload(fetch_sheet_fn=read_vendor_series_for_vendor, fetch_fx_fn=fetc
             'daysMissing': len(arr) - len(present),
         }
 
+    fx_save = {d: v for d, v in _FX_KNOWN.items() if d != '__loaded__'}
     return {'dates': dates, 'vendors': vendors, 'generatedAt': now_str(),
-            'fxAvailable': fx_available, 'needsFx': needs_fx}
+            'fxAvailable': fx_available, 'needsFx': needs_fx,
+            'fxNote': fx_note(), 'fxRates': fx_save}
 
 
 APCORN_RAW_SHEET = 'APCORN_SSP_raw'
