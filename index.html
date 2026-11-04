@@ -863,7 +863,10 @@ function renderTrend(){
 
   document.getElementById('fxWarnBanner').innerHTML = excluded.length
     ? `<div class="fx-warn-banner">환율 조회에 실패해 ${excluded.map(k=>PAYLOAD.vendors[k].label).join(' · ')}은(는) USD 원본 값이라 통합 차트에서 제외했습니다. 잠시 후 새로고침하면 원화로 합쳐집니다.</div>`
-    : '';
+    : (PAYLOAD.fxNote
+      // 환율 사이트가 잠깐 안 될 때: 저장된 환율로 계산했다는 안내만 (매체는 그대로 합산)
+      ? `<div class="fx-warn-banner" style="opacity:.85">${PAYLOAD.fxNote}</div>`
+      : '');
 
   const canvasEl = document.getElementById('trendCanvas');
   canvasEl.style.display = '';
