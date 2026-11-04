@@ -413,6 +413,8 @@
   .daily-table-card{margin-bottom:8px;}
   @media (max-width:640px){ .split-groups{grid-template-columns:1fr !important;} }
   .seg button:disabled{opacity:.35;cursor:not-allowed;}
+
+  .seg.is-off{opacity:.35;pointer-events:none;}  /* AOS·iOS 합산 중엔 OS 선택이 의미 없으므로 잠금 */
 </style>
 </head>
 <body>
@@ -547,6 +549,13 @@
         <button data-acc="Blomics">Blomics</button>
         <button data-acc="아바티">아바티</button>
       </div>
+        <div class="seg" id="ad-osSegHeat">
+          <button data-os="merged" class="active" title="같은 지면의 Android·iOS를 한 줄로 더해서 봅니다">AOS+iOS 합산</button>
+          <button data-os="all" title="Android·iOS를 나눠서 봅니다">OS별</button>
+          <button data-os="Android">Android</button>
+          <button data-os="IOS">iOS</button>
+          <button data-os="미분류" title="지면명·매체명에서 AOS/iOS 표기를 찾지 못한 지면">미분류</button>
+        </div>
     </div>
     <table class="heat" id="ad-heatTable"></table>
     <div class="heat-legend">낮음<span class="ramp"></span>높음 (해당 지표 1위)</div>
@@ -562,6 +571,13 @@
         <button data-acc="Blomics">Blomics</button>
         <button data-acc="아바티">아바티</button>
       </div>
+        <div class="seg" id="ad-osSegScatter">
+          <button data-os="merged" class="active" title="같은 지면의 Android·iOS를 하나로 더해서 봅니다">AOS+iOS 합산</button>
+          <button data-os="all" title="Android·iOS를 나눠서 봅니다">OS별</button>
+          <button data-os="Android">Android</button>
+          <button data-os="IOS">iOS</button>
+          <button data-os="미분류" title="지면명·매체명에서 AOS/iOS 표기를 찾지 못한 지면">미분류</button>
+        </div>
     </div>
     <div class="legend-row">
       <span><i style="background:#5ee6a4"></i>규모·효율 모두 우수</span>
@@ -692,17 +708,105 @@ function periodDates(rangeS, rangeE){ return DATA.dates.slice(rangeS,rangeE+1); 
 
 // 선택 기간 + 주어진 계정 필터 + 네트워크 필터 + 공유 지면 필터 기준 지면별 집계
 // (비율 지표는 합산 후 도출 — 일별 비율의 단순평균이 아님)
-function aggregate(accFilter){
+
+/* ---------- 지면명 정렬 + AOS·iOS 합산 보기 (2026-11) ----------
+ * 히트맵에서 같은 지면의 Android·iOS 두 줄을 한 줄로 합쳐 볼 수 있게 한다.
+ * - 이름에서 OS 표기(AOS·IOS·Android 등)를 뺀 '기본 이름'이 같으면 같은 지면으로 본다.
+ * - 합친 줄은 일자별 데이터를 칸마다 더한 가상 지면이라, 일자별 표·추이 팝업·변화율이 그대로 동작한다.
+ * - 지면명 열 머리를 누르면 기본 이름 순으로 정렬되어, 합치지 않아도 Android·iOS가 나란히 붙는다.
+ */
+let mergeOs = true;
+let osHeat = 'merged';
+let osScatter = 'merged';   // 'merged' | 'all'(OS별) | 'Android' | 'IOS' | '미분류'   // 기본: 같은 지면의 Android·iOS를 한 줄로 합산
+let MERGED = new Map();
+const OS_TOKEN_RE = /(^|[_\s\-\/(\[])(?:AOS|IOS|Android|안드로이드|아이폰|iPhone)(?=$|[_\s\-\/)\]])/gi;
+function osBaseName(s){
+  const t = String(s == null ? '' : s);
+  const b = t.replace(OS_TOKEN_RE, '$1').replace(/\(\s*\)|\[\s*\]/g, '')
+    .replace(/([_\-\/])[_\s\-\/]+/g, '$1').replace(/\s{2,}/g, ' ')
+    .replace(/^[_\s\-\/]+|[_\s\-\/]+$/g, '').trim();
+  return b || t;
+}
+function osLabel(o){ return o === 'IOS' ? 'iOS' : (o || ''); }
+// ADOP 지면의 OS: 매체(앱)명·지면명의 AOS/iOS 표기로 판별, 못 찾으면 '미분류'
+function detectOs(p){
+  const t = ' ' + (p.media || '') + ' ' + (p.name || '') + ' ';
+  if (/[^a-z](aos|android)(?=[^a-z])|안드로이드/i.test(t)) return 'Android';
+  if (/[^a-z](ios|iphone)(?=[^a-z])|아이폰/i.test(t)) return 'IOS';
+  return '미분류';
+}
+function plById(id){ return MERGED.get(id) || DATA.placements.find(x => x.id === id); }
+// 숫자 배열은 칸마다 더하고(둘 다 비면 null 유지), 객체는 안쪽까지 내려가며 더한다
+function sumDeep(a, b){
+  if (Array.isArray(a) && Array.isArray(b)){
+    const n = Math.max(a.length, b.length), out = [];
+    for (let i = 0; i < n; i++){
+      const v = a[i], w = b[i];
+      if (v == null) out.push(w == null ? null : w);
+      else if (w == null) out.push(v);
+      else out.push(typeof v === 'number' && typeof w === 'number' ? v + w : v);
+    }
+    return out;
+  }
+  if (a && b && typeof a === 'object' && typeof b === 'object'){
+    const o = Object.assign({}, a);
+    Object.keys(b).forEach(k => { o[k] = (k in a) ? sumDeep(a[k], b[k]) : b[k]; });
+    return o;
+  }
+  return a;
+}
+function mergeByOs(list){
+  const groups = new Map();
+  list.forEach(p => {
+    const k = MERGE_KEY(p);
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push(p);
+  });
+  // 초기화하지 않고 덮어쓰기만 한다: 히트맵·분포도가 서로 다른 계정/필터로 합산해도
+  // 양쪽 줄을 모두 찾을 수 있게 (같은 id면 내용도 같다)
+  const out = [];
+  groups.forEach((ps, k) => {
+    if (ps.length === 1){ out.push(ps[0]); return; }
+    let m = JSON.parse(JSON.stringify(ps[0]));
+    ps.slice(1).forEach(p => { m = sumDeep(m, p); });
+    Object.assign(m, MERGE_FIELDS(ps), {
+      id: 'merged|' + k, mergedFrom: ps.map(p => p.id), status: null, lifecycle: null,
+      stopped: ps.every(p => p.stopped),
+      lastDate: ps.map(p => p.lastDate || '').sort().pop() || null,
+    });
+    MERGED.set(m.id, m);
+    out.push(m);
+  });
+  return out;
+}
+function nameCmp(a, b){
+  return osBaseName(a.name).localeCompare(osBaseName(b.name), 'ko', {numeric: true})
+    || String(a.account || '').localeCompare(String(b.account || ''), 'ko')
+    || String(a.media || a.os || '').localeCompare(String(b.media || b.os || ''), 'ko')
+    || String(a.name).localeCompare(String(b.name), 'ko');
+}
+
+// ADOP는 계정이 다르면 다른 지면. 같은 계정 안에서 매체(앱)·광고단위 이름의 OS 표기만 다른 것을 합친다.
+const MERGE_KEY = p => [p.account, osBaseName(p.media), osBaseName(p.name)].join('|').toLowerCase();
+const MERGE_FIELDS = ps => ({
+  name: osBaseName(ps[0].name),
+  media: osBaseName(ps[0].media) + ' · ' + ps.length + '개 합산',
+  os: [...new Set(ps.map(p => osLabel(p.os)))].sort().join('+') + ' 합산',
+});
+
+function aggregate(accFilter, osSel){   // osSel: 'merged' | 'all' | 'Android' | 'IOS' | '미분류'
   let src = accFilter==='all' ? DATA.placements : DATA.placements.filter(p=>p.account===accFilter);
   if (netFilter !== 'all') src = src.filter(p => p.byNet[netFilter]);  // 그 네트워크가 없는 지면은 목록에서 뺀다
   if (placementFilter) src = src.filter(p => placementFilter.has(p.id));
+  if (osSel && osSel !== 'all' && osSel !== 'merged') src = src.filter(p => p.os === osSel);
+  if (osSel === 'merged') src = mergeByOs(src);
   const rows = src.map(p=>{
     let imp=0,clk=0,rev=0,any=false;
     for(let i=sI;i<=eI;i++){
       const c=cellOf(p,i);
       if(c){imp+=c.imp;clk+=c.clk;rev+=c.rev;any=true;}
     }
-    return {id:p.id,name:p.name,account:p.account,media:p.media,
+    return {id:p.id,name:p.name,account:p.account,media:p.media,merged:!!p.mergedFrom,os:p.os,
       impressions:any?imp:null, clicks:any?clk:null, revenue:any?rev:null,
       ctr:imp?clk/imp:null, cpc:clk?rev/clk:null, ecpm:imp?rev/imp*1000:null};
   });
@@ -712,7 +816,7 @@ function aggregate(accFilter){
   rows.forEach(r=>{
     r.revShare = tot?( (r.revenue||0)/tot ):null;
     // 변화율은 선택 기간과 무관하게 항상 최근 14일 기준(위 computeChangeRates 참고)
-    const p = DATA.placements.find(x => x.id === r.id);
+    const p = plById(r.id);
     const ch = p ? computeChangeRates(p) : {revenueChange:null, ecpmChange:null};
     r.revenueChange = ch.revenueChange;
     r.ecpmChange = ch.ecpmChange;
@@ -757,7 +861,7 @@ function applyAccHeat(acc){
   document.querySelectorAll('#ad-accSegHeat button').forEach(b=>b.classList.toggle('active', b.dataset.acc===acc));
   // 필터를 바꾸면 펼쳐둔 지면이 목록에서 사라질 수 있으므로 접는다
   if(openId!=null){
-    const still = aggregate(accHeat).some(r=>r.id===openId);
+    const still = aggregate(accHeat, osHeat).some(r=>r.id===openId);
     if(!still) openId=null;
   }
   renderNetSelect();
@@ -808,7 +912,7 @@ function renderNetSelect(){
 function applyNetFilter(n){
   netFilter = n;
   document.getElementById('ad-netSelect').classList.toggle('has-filter', n !== 'all');
-  if(openId!=null && !aggregate(accHeat).some(r=>r.id===openId)) openId=null;
+  if(openId!=null && !aggregate(accHeat, osHeat).some(r=>r.id===openId)) openId=null;
   if(modalState) closeModal();
   renderScatter(); renderHeat();
 }
@@ -864,7 +968,7 @@ function currentSelection(){
 function commitSelection(sel){
   placementFilter = (sel.size === DATA.placements.length) ? null : sel;
   updatePlacementFilterCount();
-  if(openId!=null && placementFilter && !placementFilter.has(openId)) openId=null;
+  if(openId!=null && placementFilter && !placementFilter.has(openId) && !MERGED.has(openId)) openId=null;
   renderScatter(); renderHeat();
 }
 function applyPlacementFilterChange(ev){
@@ -910,7 +1014,7 @@ function renderScatter(){
   // 데이터 없음/오류로 이전에 캔버스 자리가 <div>로 바뀌어 있을 수 있으므로,
   // 그릴 데이터가 있을 가능성에 대비해 항상 먼저 진짜 <canvas>로 되돌려놓는다.
   ensureScatterCanvas();
-  const all=aggregate(accScatter);
+  const all=aggregate(accScatter, osScatter);
   // 로그 축은 0 이하를 표현할 수 없어 Chart.js가 해당 점을 조용히 빼버린다.
   // 사용자가 모르게 지면이 사라지지 않도록 직접 걸러내고 몇 개가 빠졌는지 표시한다.
   const rows=all.filter(r=>r.impressions!=null && r.impressions>0 && r.ecpm!=null);
@@ -1014,7 +1118,7 @@ function computeChangeRates(placement){
 }
 
 function renderHeat(){
-  const rows=aggregate(accHeat);
+  const rows=aggregate(accHeat, osHeat);
   const pctByKey={};
   METRICS.filter(m=>m.key!=='name').forEach(m=>{
     const vals=rows.map(r=>r[m.key]).filter(v=>v!=null).sort((a,b)=>a-b);
@@ -1030,6 +1134,7 @@ function renderHeat(){
   const sortMeta = METRICS.find(m => m.key === sortKey);
   const sortIsChange = !!(sortMeta && sortMeta.isChange);
   const sorted=[...rows].sort((a,b)=>{
+    if (sortKey==='name'){ const c=nameCmp(a,b); return sortDir==='asc'?c:-c; }
     const av=a[sortKey], bv=b[sortKey];
     // 변화율 열도 다른 지표 열과 동일하게 부호 그대로 정렬한다
     // (내림차순=가장 많이 오른 지면부터, 오름차순=가장 많이 떨어진 지면부터).
@@ -1052,14 +1157,14 @@ function renderHeat(){
     return;
   }
 
-  let h='<thead><tr><th>지면명</th>'+METRICS.map(m=>{
+  let h='<thead><tr><th data-k="name" class="'+(sortKey==='name'?'sorted':'')+'" title="OS 표기를 뺀 이름 순 — Android·iOS가 나란히 붙습니다">지면명'+(sortKey==='name'?(sortDir==='desc'?' ▼':' ▲'):'')+'</th>'+METRICS.map(m=>{
     const arrow=sortKey===m.key?(sortDir==='desc'?' ▼':' ▲'):'';
     return `<th data-k="${m.key}" class="${sortKey===m.key?'sorted':''}">${m.label}${arrow}</th>`;
   }).join('')+'</tr></thead><tbody>';
 
   sorted.forEach(r=>{
     const isOpen = openId===r.id;
-    const pl = DATA.placements.find(x=>x.id===r.id);
+    const pl = plById(r.id);
     // 전체 네트워크 보기일 때만 네트워크 태그 (특정 네트워크만 볼 땐 이미 그 네트워크라 중복 정보)
     let nb = '';
     if (pl && netFilter === 'all'){
@@ -1067,7 +1172,7 @@ function renderHeat(){
       nets.slice(0,2).forEach(n => { nb += `<span class="net-badge">${n}</span>`; });
       if (nets.length > 2) nb += `<span class="net-badge" title="${nets.slice(2).join(', ')}">+${nets.length-2}</span>`;
     }
-    const tag = r.account + (r.media ? ' · ' + r.media : '');
+    const tag = r.account + (r.media ? ' · ' + r.media : '') + (!r.merged && r.os === '미분류' ? ' · OS 미분류' : '');
     h+=`<tr><td class="name-cell${isOpen?' open':''}" data-id="${r.id}"><span class="arrow">▶</span>`
       + `<div class="nm"><div class="nm-line">${r.name}${nb}</div><div class="acc-tag">${tag}</div></div></td>`;
     METRICS.filter(m=>m.key!=='name').forEach(m=>{
@@ -1093,7 +1198,7 @@ function renderHeat(){
   document.querySelectorAll('#ad-heatTable th[data-k]').forEach(th=>{
     th.addEventListener('click',()=>{
       const k=th.dataset.k;
-      if(sortKey===k)sortDir=sortDir==='desc'?'asc':'desc'; else{sortKey=k;sortDir='desc';}
+      if(sortKey===k)sortDir=sortDir==='desc'?'asc':'desc'; else{sortKey=k;sortDir=(k==='name')?'asc':'desc';}
       renderHeat();
     });
   });
@@ -1113,7 +1218,7 @@ function renderHeat(){
 
 // 지면명 클릭 시 그 아래로 펼쳐지는 일자별 표 (현재 선택된 기간 기준)
 function renderDrillRow(id){
-  const p=DATA.placements.find(x=>x.id===id);
+  const p=plById(id);
   if(!p) return '';
   const ds=periodDates(sI,eI);
   let rowsHtml='';
@@ -1151,15 +1256,15 @@ function defaultModalRange(){
 }
 
 function openModal(placementId, metricKey){
-  const p = DATA.placements.find(x=>x.id===placementId);
+  const p = plById(placementId);
   if(!p) return;
-  const [defS, defE] = defaultModalRange();
-  modalState = {placementId, metricKey, sI: defS, eI: defE};
+  // 팝업 그래프 기간은 히트맵에서 고른 기간을 그대로 따른다 (팝업 안에서 다시 바꿀 수 있음)
+  modalState = {placementId, metricKey, sI: sI, eI: eI};
   const m = METRICS.find(x=>x.key===metricKey);
   document.getElementById('ad-modalTitle').textContent = `${p.name} · ${m.label}`;
   document.getElementById('ad-modalSub').textContent = `(${p.account}${p.media?' · '+p.media:''} · ${netFilter==='all'?'전체 네트워크':netFilter})`;
   document.querySelectorAll('#ad-modalPresetSeg button').forEach(b=>
-    b.classList.toggle('active', b.dataset.p===MODAL_DEFAULT_PRESET));
+    b.classList.toggle('active', b.dataset.p===activePreset));
   syncModalInputs();
   document.getElementById('ad-modalBackdrop').classList.add('open');
   renderModalChart();
@@ -1192,7 +1297,7 @@ function closeModal(){
 }
 
 function modalSeries(){
-  const p = DATA.placements.find(x=>x.id===modalState.placementId);
+  const p = plById(modalState.placementId);
   const {sI:ms, eI:me} = modalState;
   const dates = periodDates(ms,me);
   const imp=[], clk=[], rev=[];
@@ -1248,6 +1353,19 @@ function renderModalChart(){
 
 document.getElementById('ad-presetSeg').addEventListener('click',e=>{
   const b=e.target.closest('button'); if(!b)return; applyPreset(b.dataset.p);
+});
+document.getElementById('ad-osSegScatter').addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b) return;
+  osScatter = b.dataset.os;
+  document.querySelectorAll('#ad-osSegScatter button').forEach(x=>x.classList.toggle('active', x===b));
+  renderScatter();
+});
+document.getElementById('ad-osSegHeat').addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b) return;
+  osHeat = b.dataset.os; mergeOs = (osHeat === 'merged');
+  document.querySelectorAll('#ad-osSegHeat button').forEach(x=>x.classList.toggle('active', x===b));
+  openId = null;
+  renderHeat();
 });
 document.getElementById('ad-accSegHeat').addEventListener('click',e=>{
   const b=e.target.closest('button'); if(!b)return; applyAccHeat(b.dataset.acc);
@@ -1309,6 +1427,17 @@ function renderDataChecks(payload){
 
 function initPage(payload){
   DATA = payload;
+  (DATA.placements || []).forEach(p => { p.os = detectOs(p); });
+  // 데이터에 없는 OS 버튼은 숨김 (예: 미분류 지면이 없으면 '미분류' 버튼 안 보임)
+  const osSet = new Set((DATA.placements || []).map(p => p.os));
+  document.querySelectorAll('#ad-osSegHeat button, #ad-osSegScatter button').forEach(b => {
+    const v = b.dataset.os;
+    b.style.display = (v === 'merged' || v === 'all' || osSet.has(v)) ? '' : 'none';
+  });
+  if (osHeat !== 'merged' && osHeat !== 'all' && !osSet.has(osHeat)) { osHeat = 'merged'; mergeOs = true; }
+  if (osScatter !== 'merged' && osScatter !== 'all' && !osSet.has(osScatter)) osScatter = 'merged';
+  document.querySelectorAll('#ad-osSegScatter button').forEach(b => b.classList.toggle('active', b.dataset.os === osScatter));
+  document.querySelectorAll('#ad-osSegHeat button').forEach(b => b.classList.toggle('active', b.dataset.os === osHeat));
   MONEY_IS_USD = payload.fxAvailable === false;
   renderDataChecks(payload);
   // 계정 버튼은 데이터에 있는 계정만 보인다 (예: Blomics는 연동 후 데이터가 생겨야 나타남).
