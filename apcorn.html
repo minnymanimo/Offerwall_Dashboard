@@ -393,6 +393,8 @@
   @media (max-width:640px){ .split-groups{grid-template-columns:1fr !important;} }
   .heat-card{overflow-x:auto;}  /* 좁은 화면에서 히트맵 표만 가로 스크롤 (페이지 전체가 밀리지 않게) */
   .seg button:disabled{opacity:.35;cursor:not-allowed;}
+
+  .seg.is-off{opacity:.35;pointer-events:none;}  /* AOS·iOS 합산 중엔 OS 선택이 의미 없으므로 잠금 */
 </style>
 </head>
 <body>
@@ -516,7 +518,8 @@
         <div class="card-sub">색은 <b style="color:var(--text-dim)">현재 필터·기간 안에서의</b> 순위(백분위)입니다. <b style="color:var(--text-dim)">지면명을 클릭하면</b> 일자별 표가 펼쳐지고, <b style="color:var(--text-dim)">숫자를 클릭하면</b> 그 지표의 일별 추이가 팝업으로 뜹니다.</div>
       </div>
       <div class="seg" id="ap-osSegHeat">
-        <button data-os="all" class="active">전체</button>
+        <button data-os="merged" class="active" title="같은 지면의 Android·iOS를 한 줄로 더해서 봅니다">AOS+iOS 합산</button>
+          <button data-os="all" title="Android·iOS를 나눠서 봅니다">OS별</button>
         <button data-os="Android">Android</button>
         <button data-os="IOS">iOS</button>
         <button data-os="미지정">미지정</button>
@@ -530,7 +533,8 @@
     <div class="card-head">
       <div class="card-title">규모 × 효율 분포</div>
       <div class="seg" id="ap-osSegScatter">
-        <button data-os="all" class="active">전체</button>
+        <button data-os="merged" class="active" title="같은 지면의 Android·iOS를 하나로 더해서 봅니다">AOS+iOS 합산</button>
+          <button data-os="all" title="Android·iOS를 나눠서 봅니다">OS별</button>
         <button data-os="Android">Android</button>
         <button data-os="IOS">iOS</button>
         <button data-os="미지정">미지정</button>
@@ -701,7 +705,7 @@ function getVar(n){ return getComputedStyle(document.documentElement).getPropert
 let sI=0, eI=0, activePreset='7';
 let sortKey='revenue', sortDir='desc';
 // 히트맵과 분포도는 서로 다른 용도로 쓰이므로 OS 필터를 각각 독립적으로 둔다.
-let osHeat='all', osScatter='all';
+let osHeat='merged', osScatter='merged';   // 둘 다 기본은 AOS+iOS 합산
 // 지면 선택 필터는 반대로 히트맵·분포도 양쪽에 공유로 적용한다(사용자 요청).
 // null = 전체 지면 표시, Set이면 그 안의 id만 표시.
 let placementFilter = null;
@@ -715,9 +719,87 @@ function periodDates(rangeS, rangeE){ return DATA.dates.slice(rangeS,rangeE+1); 
 
 // 선택 기간 + 주어진 OS 필터 + 공유 지면 필터 기준 지면별 집계
 // (비율 지표는 합산 후 도출 — 일별 비율의 단순평균이 아님)
-function aggregate(osFilter){
-  let src = osFilter==='all' ? DATA.placements : DATA.placements.filter(p=>p.os===osFilter);
+
+/* ---------- 지면명 정렬 + AOS·iOS 합산 보기 (2026-11) ----------
+ * 히트맵에서 같은 지면의 Android·iOS 두 줄을 한 줄로 합쳐 볼 수 있게 한다.
+ * - 이름에서 OS 표기(AOS·IOS·Android 등)를 뺀 '기본 이름'이 같으면 같은 지면으로 본다.
+ * - 합친 줄은 일자별 데이터를 칸마다 더한 가상 지면이라, 일자별 표·추이 팝업·변화율이 그대로 동작한다.
+ * - 지면명 열 머리를 누르면 기본 이름 순으로 정렬되어, 합치지 않아도 Android·iOS가 나란히 붙는다.
+ */
+let mergeOs = true;   // 기본: 같은 지면의 Android·iOS를 한 줄로 합산
+let MERGED = new Map();
+const OS_TOKEN_RE = /(^|[_\s\-\/(\[])(?:AOS|IOS|Android|안드로이드|아이폰|iPhone)(?=$|[_\s\-\/)\]])/gi;
+function osBaseName(s){
+  const t = String(s == null ? '' : s);
+  const b = t.replace(OS_TOKEN_RE, '$1').replace(/\(\s*\)|\[\s*\]/g, '')
+    .replace(/([_\-\/])[_\s\-\/]+/g, '$1').replace(/\s{2,}/g, ' ')
+    .replace(/^[_\s\-\/]+|[_\s\-\/]+$/g, '').trim();
+  return b || t;
+}
+function osLabel(o){ return o === 'IOS' ? 'iOS' : (o || ''); }
+function plById(id){ return MERGED.get(id) || DATA.placements.find(x => x.id === id); }
+// 숫자 배열은 칸마다 더하고(둘 다 비면 null 유지), 객체는 안쪽까지 내려가며 더한다
+function sumDeep(a, b){
+  if (Array.isArray(a) && Array.isArray(b)){
+    const n = Math.max(a.length, b.length), out = [];
+    for (let i = 0; i < n; i++){
+      const v = a[i], w = b[i];
+      if (v == null) out.push(w == null ? null : w);
+      else if (w == null) out.push(v);
+      else out.push(typeof v === 'number' && typeof w === 'number' ? v + w : v);
+    }
+    return out;
+  }
+  if (a && b && typeof a === 'object' && typeof b === 'object'){
+    const o = Object.assign({}, a);
+    Object.keys(b).forEach(k => { o[k] = (k in a) ? sumDeep(a[k], b[k]) : b[k]; });
+    return o;
+  }
+  return a;
+}
+function mergeByOs(list){
+  const groups = new Map();
+  list.forEach(p => {
+    const k = MERGE_KEY(p);
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push(p);
+  });
+  // 초기화하지 않고 덮어쓰기만 한다: 히트맵·분포도가 서로 다른 계정/필터로 합산해도
+  // 양쪽 줄을 모두 찾을 수 있게 (같은 id면 내용도 같다)
+  const out = [];
+  groups.forEach((ps, k) => {
+    if (ps.length === 1){ out.push(ps[0]); return; }
+    let m = JSON.parse(JSON.stringify(ps[0]));
+    ps.slice(1).forEach(p => { m = sumDeep(m, p); });
+    Object.assign(m, MERGE_FIELDS(ps), {
+      id: 'merged|' + k, mergedFrom: ps.map(p => p.id), status: null, lifecycle: null,
+      stopped: ps.every(p => p.stopped),
+      lastDate: ps.map(p => p.lastDate || '').sort().pop() || null,
+    });
+    MERGED.set(m.id, m);
+    out.push(m);
+  });
+  return out;
+}
+function nameCmp(a, b){
+  return osBaseName(a.name).localeCompare(osBaseName(b.name), 'ko', {numeric: true})
+    || String(a.account || '').localeCompare(String(b.account || ''), 'ko')
+    || String(a.media || a.os || '').localeCompare(String(b.media || b.os || ''), 'ko')
+    || String(a.name).localeCompare(String(b.name), 'ko');
+}
+
+const MERGE_KEY = p => osBaseName(p.name).toLowerCase();
+const MERGE_FIELDS = ps => ({
+  name: osBaseName(ps[0].name),
+  os: [...new Set(ps.map(p => osLabel(p.os)))]
+        .sort((x, y) => (x === 'Android' ? 0 : 1) - (y === 'Android' ? 0 : 1) || x.localeCompare(y)).join('+') + ' 합산',
+});
+
+function aggregate(osFilter, forHeat){
+  // AOS·iOS 합산 중에는 OS 필터를 무시(전체)
+  let src = (osFilter==='all' || osFilter==='merged') ? DATA.placements : DATA.placements.filter(p=>p.os===osFilter);
   if (placementFilter) src = src.filter(p => placementFilter.has(p.id));
+  if (osFilter==='merged') src = mergeByOs(src);
   const rows = src.map(p=>{
     let imp=0,clk=0,rev=0,any=false;
     for(let i=sI;i<=eI;i++){
@@ -733,7 +815,7 @@ function aggregate(osFilter){
   rows.forEach(r=>{
     r.revShare = tot?( (r.revenue||0)/tot ):null;
     // 변화율은 선택 기간과 무관하게 항상 최근 14일 기준(위 computeChangeRates 참고)
-    const p = DATA.placements.find(x => x.id === r.id);
+    const p = plById(r.id);
     const ch = p ? computeChangeRates(p) : {revenueChange:null, ecpmChange:null};
     r.revenueChange = ch.revenueChange;
     r.ecpmChange = ch.ecpmChange;
@@ -773,10 +855,11 @@ function onDateInputChange(){
 
 function applyOsHeat(os){
   osHeat=os;
+  mergeOs = (os === 'merged');
   document.querySelectorAll('#ap-osSegHeat button').forEach(b=>b.classList.toggle('active', b.dataset.os===os));
   // 필터를 바꾸면 펼쳐둔 지면이 목록에서 사라질 수 있으므로 접는다
   if(openId!=null){
-    const still = aggregate(osHeat).some(r=>r.id===openId);
+    const still = aggregate(osHeat, true).some(r=>r.id===openId);
     if(!still) openId=null;
   }
   renderHeat();
@@ -839,7 +922,7 @@ function currentSelection(){
 function commitSelection(sel){
   placementFilter = (sel.size === DATA.placements.length) ? null : sel;
   updatePlacementFilterCount();
-  if(openId!=null && placementFilter && !placementFilter.has(openId)) openId=null;
+  if(openId!=null && placementFilter && !placementFilter.has(openId) && !MERGED.has(openId)) openId=null;
   renderScatter(); renderHeat();
 }
 function applyPlacementFilterChange(ev){
@@ -885,7 +968,7 @@ function renderScatter(){
   // 데이터 없음/오류로 이전에 캔버스 자리가 <div>로 바뀌어 있을 수 있으므로,
   // 그릴 데이터가 있을 가능성에 대비해 항상 먼저 진짜 <canvas>로 되돌려놓는다.
   ensureScatterCanvas();
-  const all=aggregate(osScatter);
+  const all=aggregate(osScatter, true);
   // 로그 축은 0 이하를 표현할 수 없어 Chart.js가 해당 점을 조용히 빼버린다.
   // 사용자가 모르게 지면이 사라지지 않도록 직접 걸러내고 몇 개가 빠졌는지 표시한다.
   const rows=all.filter(r=>r.impressions!=null && r.impressions>0 && r.ecpm!=null);
@@ -988,7 +1071,7 @@ function computeChangeRates(placement){
 }
 
 function renderHeat(){
-  const rows=aggregate(osHeat);
+  const rows=aggregate(osHeat, true);
   const pctByKey={};
   METRICS.filter(m=>m.key!=='name').forEach(m=>{
     const vals=rows.map(r=>r[m.key]).filter(v=>v!=null).sort((a,b)=>a-b);
@@ -1004,6 +1087,7 @@ function renderHeat(){
   const sortMeta = METRICS.find(m => m.key === sortKey);
   const sortIsChange = !!(sortMeta && sortMeta.isChange);
   const sorted=[...rows].sort((a,b)=>{
+    if (sortKey==='name'){ const c=nameCmp(a,b); return sortDir==='asc'?c:-c; }
     const av=a[sortKey], bv=b[sortKey];
     // 변화율 열도 다른 지표 열과 동일하게 부호 그대로 정렬한다
     // (내림차순=가장 많이 오른 지면부터, 오름차순=가장 많이 떨어진 지면부터).
@@ -1026,14 +1110,14 @@ function renderHeat(){
     return;
   }
 
-  let h='<thead><tr><th>지면명</th>'+METRICS.map(m=>{
+  let h='<thead><tr><th data-k="name" class="'+(sortKey==='name'?'sorted':'')+'" title="OS 표기를 뺀 이름 순 — Android·iOS가 나란히 붙습니다">지면명'+(sortKey==='name'?(sortDir==='desc'?' ▼':' ▲'):'')+'</th>'+METRICS.map(m=>{
     const arrow=sortKey===m.key?(sortDir==='desc'?' ▼':' ▲'):'';
     return `<th data-k="${m.key}" class="${sortKey===m.key?'sorted':''}">${m.label}${arrow}</th>`;
   }).join('')+'</tr></thead><tbody>';
 
   sorted.forEach(r=>{
     const isOpen = openId===r.id;
-    const pl = DATA.placements.find(x=>x.id===r.id);
+    const pl = plById(r.id);
     const sb = pl ? statusBadge(pl.status, pl.lifecycle) : '';
     h+=`<tr><td class="name-cell${isOpen?' open':''}" data-id="${r.id}"><span class="arrow">▶</span>${r.name}<span style="color:var(--text-faint);font-size:11.5px">(${r.os})</span>${sb}</td>`;
     METRICS.filter(m=>m.key!=='name').forEach(m=>{
@@ -1059,7 +1143,7 @@ function renderHeat(){
   document.querySelectorAll('#ap-heatTable th[data-k]').forEach(th=>{
     th.addEventListener('click',()=>{
       const k=th.dataset.k;
-      if(sortKey===k)sortDir=sortDir==='desc'?'asc':'desc'; else{sortKey=k;sortDir='desc';}
+      if(sortKey===k)sortDir=sortDir==='desc'?'asc':'desc'; else{sortKey=k;sortDir=(k==='name')?'asc':'desc';}
       renderHeat();
     });
   });
@@ -1079,7 +1163,7 @@ function renderHeat(){
 
 // 지면명 클릭 시 그 아래로 펼쳐지는 일자별 표 (현재 선택된 기간 기준)
 function renderDrillRow(id){
-  const p=DATA.placements.find(x=>x.id===id);
+  const p=plById(id);
   if(!p) return '';
   const ds=periodDates(sI,eI);
   let rowsHtml='';
@@ -1116,15 +1200,15 @@ function defaultModalRange(){
 }
 
 function openModal(placementId, metricKey){
-  const p = DATA.placements.find(x=>x.id===placementId);
+  const p = plById(placementId);
   if(!p) return;
-  const [defS, defE] = defaultModalRange();
-  modalState = {placementId, metricKey, sI: defS, eI: defE};
+  // 팝업 그래프 기간은 히트맵에서 고른 기간을 그대로 따른다 (팝업 안에서 다시 바꿀 수 있음)
+  modalState = {placementId, metricKey, sI: sI, eI: eI};
   const m = METRICS.find(x=>x.key===metricKey);
   document.getElementById('ap-modalTitle').textContent = `${p.name} · ${m.label}`;
   document.getElementById('ap-modalSub').textContent = `(${p.os})`;
   document.querySelectorAll('#ap-modalPresetSeg button').forEach(b=>
-    b.classList.toggle('active', b.dataset.p===MODAL_DEFAULT_PRESET));
+    b.classList.toggle('active', b.dataset.p===activePreset));
   syncModalInputs();
   document.getElementById('ap-modalBackdrop').classList.add('open');
   renderModalChart();
@@ -1157,7 +1241,7 @@ function closeModal(){
 }
 
 function modalSeries(){
-  const p = DATA.placements.find(x=>x.id===modalState.placementId);
+  const p = plById(modalState.placementId);
   const {sI:ms, eI:me} = modalState;
   const dates = periodDates(ms,me);
   const imp = p.impressions.slice(ms,me+1), clk = p.clicks.slice(ms,me+1), rev = p.revenue.slice(ms,me+1);
