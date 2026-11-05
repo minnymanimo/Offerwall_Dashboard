@@ -614,7 +614,7 @@ def find_gaps(arr):
 FX_CACHE_FILE = 'data.json'          # 이전 실행이 남긴 fxRates를 여기서 읽는다
 _FX_KNOWN = {}                       # 날짜 → 환율 (이번 실행에서 받은 것 + 저장본)
 _FX_FETCHED = set()                  # 이번 실행에서 API로 받아 본 (연도 구간) 키
-FX_STATUS = {'source': None, 'failedRanges': []}   # 'api' | 'cache' | None
+FX_STATUS = {'used': {}, 'down': set(), 'dailyFails': {}}   # 이번 실행에서 쓴 출처(날짜 수) / 실패한 출처
 
 
 def _load_fx_cache():
@@ -631,66 +631,144 @@ def _load_fx_cache():
         pass
 
 
-def _fetch_fx_range_api(a, b, tries=3):
+# --- 환율 출처 목록 (위에서부터 시도, 기준 환율은 따로 정하지 않음: 되는 곳 값을 쓴다) ---
+# 기간 출처: 한 번 요청으로 여러 날짜를 받는 곳. 1년 단위로 요청.
+# 일별 출처: 날짜마다 1번씩 불러야 하는 곳. 기간 출처로 못 채운 날짜만, 최근 날짜부터 FX_DAILY_MAX_DAYS까지.
+# 어떤 출처가 이번 실행에서 한 번 완전히 실패하면, 그 실행 동안은 다시 부르지 않는다(실행 시간 폭증 방지).
+
+def _fx_frankfurter(a, b):
     url = 'https://api.frankfurter.dev/v1/%s..%s?base=%s&symbols=%s' % (a, b, FX_BASE, FX_QUOTE)
-    last_err = None
-    for t in range(tries):
-        try:
-            data = json.loads(http_get(url, timeout=40))
-            out = {}
-            for d, obj in (data.get('rates') or {}).items():
-                if isinstance(obj, dict) and isinstance(obj.get(FX_QUOTE), (int, float)):
-                    out[d] = obj[FX_QUOTE]
-            if out:
-                return out
-            last_err = 'empty response'
-        except Exception as e:
-            last_err = e
-        time.sleep(2 * (t + 1))
-    print('  ! 환율 조회 실패 %s..%s: %s' % (a, b, last_err))
-    return None
+    data = json.loads(http_get(url, timeout=30))
+    out = {}
+    for d, obj in (data.get('rates') or {}).items():
+        if isinstance(obj, dict) and isinstance(obj.get(FX_QUOTE), (int, float)):
+            out[d] = obj[FX_QUOTE]
+    return out
+
+
+def _fx_yahoo(a, b):
+    from datetime import timezone
+    t0 = int(datetime.strptime(a, '%Y-%m-%d').replace(tzinfo=timezone.utc).timestamp())
+    t1 = int(datetime.strptime(b, '%Y-%m-%d').replace(tzinfo=timezone.utc).timestamp()) + 86400
+    url = ('https://query1.finance.yahoo.com/v8/finance/chart/%s%s=X?period1=%d&period2=%d&interval=1d'
+           % (FX_BASE if FX_BASE != 'USD' else '', FX_QUOTE, t0, t1))
+    res = (json.loads(http_get(url, timeout=30)).get('chart') or {}).get('result') or []
+    if not res:
+        return {}
+    ts = res[0].get('timestamp') or []
+    closes = (((res[0].get('indicators') or {}).get('quote') or [{}])[0]).get('close') or []
+    out = {}
+    for t, c in zip(ts, closes):
+        if isinstance(c, (int, float)) and c > 0:
+            d = datetime.fromtimestamp(t, timezone.utc).strftime('%Y-%m-%d')
+            if a <= d <= b:
+                out[d] = c
+    return out
+
+
+def _fx_currency_api_jsdelivr(d):
+    url = 'https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@%s/v1/currencies/%s.json' % (d, FX_BASE.lower())
+    return (json.loads(http_get(url, timeout=15)).get(FX_BASE.lower()) or {}).get(FX_QUOTE.lower())
+
+
+def _fx_currency_api_pages(d):   # 같은 데이터의 Cloudflare 미러 (jsDelivr가 막힐 때)
+    url = 'https://%s.currency-api.pages.dev/v1/currencies/%s.json' % (d, FX_BASE.lower())
+    return (json.loads(http_get(url, timeout=15)).get(FX_BASE.lower()) or {}).get(FX_QUOTE.lower())
+
+
+FX_RANGE_SOURCES = [('Frankfurter(ECB)', _fx_frankfurter), ('Yahoo Finance', _fx_yahoo)]
+FX_DAILY_SOURCES = [('currency-api(jsDelivr)', _fx_currency_api_jsdelivr), ('currency-api(Cloudflare)', _fx_currency_api_pages)]
+FX_DAILY_MAX_DAYS = 60
+
+
+def _try_range_sources(a, b):
+    for name, fn in FX_RANGE_SOURCES:
+        if name in FX_STATUS['down']:
+            continue
+        last_err = None
+        for t in range(2):
+            try:
+                got = fn(a, b)
+                if got:
+                    FX_STATUS['used'][name] = FX_STATUS['used'].get(name, 0) + len(got)
+                    return got
+                last_err = '빈 응답'
+            except Exception as e:
+                last_err = e
+            time.sleep(2 * (t + 1))
+        print('  ! 환율 %s 실패 %s..%s: %s' % (name, a, b, last_err))
+        FX_STATUS['down'].add(name)
+    return {}
+
+
+def _try_daily_sources(days):
+    out = {}
+    for d in sorted(days)[-FX_DAILY_MAX_DAYS:]:
+        for name, fn in FX_DAILY_SOURCES:
+            if name in FX_STATUS['down']:
+                continue
+            try:
+                v = fn(d)
+                if isinstance(v, (int, float)) and v > 0:
+                    out[d] = v
+                    FX_STATUS['used'][name] = FX_STATUS['used'].get(name, 0) + 1
+                    break
+            except Exception as e:
+                FX_STATUS['dailyFails'][name] = FX_STATUS['dailyFails'].get(name, 0) + 1
+                if FX_STATUS['dailyFails'][name] >= 3 and not FX_STATUS['used'].get(name):
+                    print('  ! 환율 %s 실패: %s' % (name, e))
+                    FX_STATUS['down'].add(name)
+    return out
+
+
+def _date_range(a, b):
+    d0 = datetime.strptime(a, '%Y-%m-%d').date(); d1 = datetime.strptime(b, '%Y-%m-%d').date()
+    out = []
+    while d0 <= d1:
+        out.append(d0.isoformat()); d0 += timedelta(days=1)
+    return out
 
 
 def fetch_usd_krw_rates(start_s, end_s):
-    """start~end 구간의 {날짜: 환율}. API 실패 시 저장본으로 대체(없으면 {})."""
+    """start~end 구간의 {날짜: 환율}. 출처 목록을 차례로 시도하고, 다 안 되면 저장본으로 대체(없으면 {})."""
     _load_fx_cache()
-    y0, y1 = int(start_s[:4]), int(end_s[:4])
-    for y in range(y0, y1 + 1):
+    this_year = int(now_str()[:4])
+    for y in range(int(start_s[:4]), int(end_s[:4]) + 1):
         a = max(start_s, '%d-01-01' % y)
         b = min(end_s, '%d-12-31' % y)
-        key = (a[:4], a, b)
+        key = (a, b)
         if key in _FX_FETCHED:
             continue
-        # 저장본이 그 해를 이미 끝까지 덮고(과거 연도) 있으면 다시 받을 필요 없음
-        if y < int(now_str()[:4]) and any(d.startswith(str(y)) and d >= b[:7] for d in _FX_KNOWN if d != '__loaded__'):
-            _FX_FETCHED.add(key)
-            continue
-        got = _fetch_fx_range_api(a, b)
         _FX_FETCHED.add(key)
-        if got:
-            _FX_KNOWN.update(got)
-            if FX_STATUS['source'] is None:
-                FX_STATUS['source'] = 'api'
-        else:
-            FX_STATUS['failedRanges'].append('%s..%s' % (a, b))
+        # 지난 연도는 저장본에 12월 환율까지 있으면 다시 받지 않는다
+        if y < this_year and any(d.startswith('%d-12' % y) for d in _FX_KNOWN if d != '__loaded__'):
+            continue
+        got = _try_range_sources(a, b)
+        _FX_KNOWN.update(got)
+        # 기간 출처로 못 받은 평일·최근 날짜는 일별 출처로 채움 (주말은 원래 환율이 없어 이어쓰기로 충분)
+        missing = [d for d in _date_range(a, b)
+                   if d not in _FX_KNOWN and datetime.strptime(d, '%Y-%m-%d').weekday() < 5]
+        if missing and not got:
+            _FX_KNOWN.update(_try_daily_sources(missing))
     rates = {d: v for d, v in _FX_KNOWN.items() if d != '__loaded__' and start_s <= d <= end_s}
-    # 앞 기간 환율이 저장돼 있으면 구간 시작 전 마지막 환율도 넘겨서 이어쓰기에 쓰게 한다
-    if rates or any(d != '__loaded__' for d in _FX_KNOWN):
-        prev = [d for d in _FX_KNOWN if d != '__loaded__' and d < start_s]
-        if prev and start_s not in rates:
-            rates.setdefault(start_s, _FX_KNOWN[max(prev)])
-    if FX_STATUS['failedRanges'] and rates:
-        FX_STATUS['source'] = 'cache'
+    prev = [d for d in _FX_KNOWN if d != '__loaded__' and d < start_s]
+    if prev and start_s not in rates:      # 구간 시작 전 마지막 환율로 이어쓰기
+        rates[start_s] = _FX_KNOWN[max(prev)]
     return rates
 
 
 def fx_note():
-    """API 일부/전체 실패로 저장된 환율을 쓴 경우 화면에 띄울 안내 (정상이면 None)."""
-    if FX_STATUS['source'] != 'cache':
+    """기본 출처(ECB) 말고 다른 출처나 저장본을 쓴 경우 화면에 띄울 안내 (정상이면 None)."""
+    used = FX_STATUS['used']
+    if not FX_STATUS['down'] and set(used) <= {'Frankfurter(ECB)'}:
         return None
+    if used:
+        return '환율 출처: ' + ', '.join('%s %d일' % (k, v) for k, v in used.items()) + \
+               ' (기본 출처가 응답하지 않아 다른 출처를 함께 사용)'
     known = sorted(d for d in _FX_KNOWN if d != '__loaded__')
-    return ('환율 사이트 응답이 없어 저장된 환율(%s까지)로 원화 환산했습니다. 이후 날짜는 마지막 환율을 이어서 씁니다.'
-            % (known[-1] if known else '-'))
+    if known:
+        return '환율 사이트 응답이 없어 저장된 환율(%s까지)로 원화 환산했습니다. 이후 날짜는 마지막 환율을 이어서 씁니다.' % known[-1]
+    return None
 
 
 def fill_rate_series(dates, rate_map):
