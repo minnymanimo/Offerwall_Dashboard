@@ -1228,6 +1228,17 @@ def _adop_num(v):
     return None
 
 
+# ADOP 쪽에서 같은 지면을 실험용 'control group'으로 임의로 나눠둔 경우가 있다 (2026-11 테크랩스 확인).
+# 우리 집계에서는 원래 지면과 같은 것으로 보고 합친다.
+#   예) '홈배너_control group', '홈배너 (Control Group)', '홈배너-controlgroup', 'control_group_홈배너' → '홈배너'
+_ADOP_CONTROL_RE = re.compile(r'[\s_\-]*[\(\[]?\s*control[\s_\-]*group\s*[\)\]]?[\s_\-]*', re.I)
+
+
+def adop_unit_name(unit):
+    cleaned = _ADOP_CONTROL_RE.sub(' ', unit).strip(' _-')
+    return re.sub(r'\s{2,}', ' ', cleaned) or unit
+
+
 def _adop_rows(sheet, fetch_fn=None):
     """raw 탭을 읽어 (정규화된 행 리스트, 중복으로 버린 행 수)를 돌려준다.
 
@@ -1245,7 +1256,7 @@ def _adop_rows(sheet, fetch_fn=None):
         key = (d, _s(r.get('comIdx')), _s(r.get('netComIdx')), unit,
                _s(r.get('zoneNo')), _s(r.get('areaIdx')), _s(r.get('netComName')))
         uniq[key] = {
-            'date': d, 'unit': unit,
+            'date': d, 'unit': adop_unit_name(unit),   # control group 표기는 떼고 원래 지면으로 합침
             'media': _s(r.get('comName')),
             'net': _s(r.get('netComName')) or '(네트워크 미상)',
             'pv': _adop_num(r.get('pv')) or 0.0,
