@@ -1228,15 +1228,31 @@ def _adop_num(v):
     return None
 
 
-# ADOP 쪽에서 같은 지면을 실험용 'control group'으로 임의로 나눠둔 경우가 있다 (2026-11 테크랩스 확인).
-# 우리 집계에서는 원래 지면과 같은 것으로 보고 합친다.
-#   예) '홈배너_control group', '홈배너 (Control Group)', '홈배너-controlgroup', 'control_group_홈배너' → '홈배너'
-_ADOP_CONTROL_RE = re.compile(r'[\s_\-]*[\(\[]?\s*control[\s_\-]*group\s*[\)\]]?[\s_\-]*', re.I)
+# ADOP unitName 정리 (2026-11, 테크랩스 확인)
+# 같은 지면이 네트워크(AdMob·Fyber·Pangle)나 설정에 따라 이름 앞뒤에 표기가 붙어 따로 잡힌다.
+# 표기를 떼고 '원래 지면 이름'으로 합친다. (11/2 기준 217개 이름 → 74개 지면)
+#   Fyber : '티머니GO-택시고속시외따릉이킥보드_' + 지면 + '_해시7자리_ControlGroup_숫자'
+#   Pangle: 지면 + '_자동모드' / '_CP_AUTO' / '_CP_BF'
+#   공통  : '_백필', '_3', '_CP_03.00', '_CP' 같은 꼬리표
+#   '…_AOS_전면_CP_BF' / '…_AOS_전면_공통(_백필)'은 같은 공통 백필 단위라 '…_AOS_전면_CP_BF'로 맞춘다.
+# 새 표기가 생기면 _ADOP_TAIL에 추가하면 된다.
+_ADOP_PREFIX = re.compile(r'^티머니GO-택시고속시외따릉이킥보드_')
+_ADOP_CONTROL = re.compile(r'(?:_[0-9a-f]{6,8})?[\s_\-]*\(?\s*control[\s_\-]*group\s*\)?(?:[\s_\-]*\d+)?', re.I)
+_ADOP_HASH = re.compile(r'_[0-9a-f]{7}$')
+_ADOP_TAIL = re.compile(r'_(?:자동모드|백필|CP_AUTO|CP_BF|AUTO|BF|CP|\d{1,2}(?:\.\d{1,2})?)$', re.I)
+_ADOP_GENERIC = re.compile(r'_(AOS|iOS|IOS)_(리워드|전면)(?:_공통)?$')
 
 
 def adop_unit_name(unit):
-    cleaned = _ADOP_CONTROL_RE.sub(' ', unit).strip(' _-')
-    return re.sub(r'\s{2,}', ' ', cleaned) or unit
+    s = _ADOP_PREFIX.sub('', str(unit).strip())
+    s = _ADOP_CONTROL.sub('', s)
+    s = _ADOP_HASH.sub('', s)
+    prev = None
+    while prev != s:          # 꼬리표가 여러 개 붙은 경우(_CP_03.00 등) 다 떼질 때까지
+        prev = s
+        s = _ADOP_TAIL.sub('', s)
+    s = _ADOP_GENERIC.sub(lambda m: '_%s_%s_CP_BF' % (m.group(1), m.group(2)), s)
+    return s.strip('_ ') or str(unit)
 
 
 def _adop_rows(sheet, fetch_fn=None):
