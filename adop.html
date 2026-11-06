@@ -390,6 +390,7 @@
 
   /* ---- 일별 지표 (전체 지면 합계) — Mobwith 상세와 같은 구성 ---- */
   .seg-caption{font-size:12.5px;color:var(--text-faint);margin-right:2px;}
+  .split-gcard.is-dim{opacity:.38;transition:opacity .15s;}
   .split-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px 22px;margin:0 0 18px;}
   .split-label{font-family:var(--mono);font-size:12.5px;letter-spacing:.06em;color:var(--text-dim);margin-bottom:8px;}
   .split-period{color:var(--text-faint);}
@@ -472,7 +473,7 @@
   <div class="controls-row">
     <div class="period-label" id="add-periodLabel">기간: –</div>
     <div class="controls">
-      <span class="seg-caption">아래 지표 기준</span>
+      <span class="seg-caption">아래 지표 기준 <span style="opacity:.7">(여러 개 선택 가능)</span></span>
       <div class="seg" id="add-seriesSeg"></div>
       <div class="seg" id="add-presetSeg">
         <button data-preset="mtd" class="active">이번 달</button>
@@ -1510,7 +1511,8 @@ function makeDailyOverview(cfg){
     {key:'ecpm',        label:'eCPM',    fmt: v => money(v)},
   ];
   let D = null, SERIES = {}, GROUPS = [];
-  let sI = 0, eI = 0, preset = 'mtd', active = 'all', charts = [], tableOpen = false;
+  let sI = 0, eI = 0, preset = 'mtd', charts = [], tableOpen = false;
+  let ACC = {}, sel = null;   // sel: null = 전체, 아니면 고른 계정 key들의 Set (여러 개 선택 → 합산)
   let sortKey = 'date', sortDir = 'asc', wired = false;
 
   function build(payload){
@@ -1531,23 +1533,42 @@ function makeDailyOverview(cfg){
         });
       }
     });
-    SERIES = {};
-    Object.keys(acc).forEach(k => {
-      const a = acc[k];
-      SERIES[k] = {
-        impressions: a.imp, clicks: a.clk, revenue: a.rev,
-        ctr: a.imp.map((v, i) => v ? a.clk[i] / v : null),
-        cpc: a.clk.map((v, i) => v ? a.rev[i] / v : null),
-        ecpm: a.imp.map((v, i) => v ? a.rev[i] / v * 1000 : null),
-      };
-    });
+    ACC = acc; SERIES = {};
+    Object.keys(acc).forEach(k => { SERIES[k] = mkSeries(acc[k]); });
     // 데이터가 있는 그룹만 카드·버튼으로 (예: '미지정' OS는 있을 때만)
     GROUPS = cfg.groups.filter(g => present.has(g.key));
-    if (active !== 'all' && !SERIES[active]) active = 'all';
+    if (sel){ sel = new Set([...sel].filter(k => SERIES[k])); if (!sel.size || sel.size === GROUPS.length) sel = null; }
+  }
+
+  function mkSeries(a){
+    return {
+      impressions: a.imp, clicks: a.clk, revenue: a.rev,
+      ctr: a.imp.map((v, i) => v ? a.clk[i] / v : null),
+      cpc: a.clk.map((v, i) => v ? a.rev[i] / v : null),
+      ecpm: a.imp.map((v, i) => v ? a.rev[i] / v * 1000 : null),   // 합산 노출·매출로 다시 계산 (단순 평균 아님)
+    };
+  }
+  // 고른 계정들을 날짜별로 더한 시리즈 (처음 쓸 때 한 번 만들고 재사용)
+  function curSeries(){
+    if (!sel) return SERIES.all;
+    const keys = [...sel].sort(), id = 'sel:' + keys.join('+');
+    if (!SERIES[id]){
+      const n = D.dates.length, sum = {imp: new Array(n).fill(null), clk: new Array(n).fill(null), rev: new Array(n).fill(null)};
+      keys.forEach(k => { const a = ACC[k]; if (a) for (let i = 0; i < n; i++){
+        if (a.imp[i] == null) continue;
+        sum.imp[i] = (sum.imp[i] || 0) + a.imp[i]; sum.clk[i] = (sum.clk[i] || 0) + (a.clk[i] || 0); sum.rev[i] = (sum.rev[i] || 0) + (a.rev[i] || 0);
+      }});
+      SERIES[id] = mkSeries(sum);
+    }
+    return SERIES[id];
+  }
+  function selLabel(){
+    if (!sel) return '';
+    return GROUPS.filter(g => sel.has(g.key)).map(g => g.label).join(' + ') + (sel.size > 1 ? ' 합산' : '');
   }
 
   function agg(s, e, key){
-    const S = SERIES[key || active];
+    const S = key ? SERIES[key] : curSeries();
     let imp = 0, clk = 0, rev = 0, any = false;
     if (S) for (let i = s; i <= e; i++){
       if (S.impressions[i] != null){ imp += S.impressions[i]; clk += S.clicks[i] || 0; rev += S.revenue[i] || 0; any = true; }
@@ -1600,7 +1621,9 @@ function makeDailyOverview(cfg){
   function renderSeriesSeg(){
     $('seriesSeg').innerHTML = '<button data-s="all">전체</button>' +
       GROUPS.map(g => `<button data-s="${g.key}">${g.label}</button>`).join('');
-    document.querySelectorAll('#' + P + '-seriesSeg button').forEach(b => b.classList.toggle('active', b.dataset.s === active));
+    document.querySelectorAll('#' + P + '-seriesSeg button').forEach(b =>
+      b.classList.toggle('active', b.dataset.s === 'all' ? !sel : !!(sel && sel.has(b.dataset.s))));
+    $('seriesSeg').title = '계정을 여러 개 누르면 고른 계정만 합산해서 봅니다';
     $('seriesSeg').style.display = GROUPS.length > 1 ? '' : 'none';
   }
 
@@ -1626,7 +1649,8 @@ function makeDailyOverview(cfg){
     box.innerHTML = GROUPS.map(g => {
       const v = agg(sI, eI, g.key).revenue;
       const pct = (all && v != null) ? `비중 ${(v / all * 100).toFixed(1)}%` : '';
-      return `<div class="split-gcard" style="--gc:${g.color}">
+      const dim = sel && !sel.has(g.key) ? ' is-dim' : '';
+      return `<div class="split-gcard${dim}" style="--gc:${g.color}">
         <div class="sg-label"><span class="sg-dot"></span>${g.label}</div>
         <div class="sg-value">${money(v)}</div>
         <div class="sg-meta">${[pct, deltaHtml(g.key, v)].filter(Boolean).join(' ')}</div>
@@ -1648,7 +1672,7 @@ function makeDailyOverview(cfg){
       return `<div class="kpi-card"><div class="kpi-label">${m.label}</div><div class="kpi-value">${m.fmt(a[m.key])}</div>
         <div class="kpi-unit">${ratio ? '기간 가중평균' : '기간 합계'}</div>${dh}</div>`;
     }).join('');
-    const label = active === 'all' ? '' : ' · ' + (GROUPS.find(g => g.key === active) || {}).label;
+    const label = sel ? ' · ' + selLabel() : '';
     $('periodLabel').textContent = `기간: ${D.dates[sI]} ~ ${D.dates[eI]} (${eI - sI + 1}일)${label}`;
   }
 
@@ -1666,7 +1690,7 @@ function makeDailyOverview(cfg){
       card.className = 'chart-card';
       card.innerHTML = `<div class="chart-title">${m.label}</div><div class="chart-box"><canvas></canvas></div>`;
       grid.appendChild(card);
-      const vals = SERIES[active][m.key].slice(sI, eI + 1);
+      const vals = curSeries()[m.key].slice(sI, eI + 1);
       const ctx = card.querySelector('canvas').getContext('2d');
       const grad = ctx.createLinearGradient(0, 0, 0, 150);
       grad.addColorStop(0, color + '33'); grad.addColorStop(1, color + '00');
@@ -1705,8 +1729,8 @@ function makeDailyOverview(cfg){
     $('tableToggleLabel').textContent = tableOpen ? '접기 ▲' : '펼치기 ▼';
   }
   function renderTable(){
-    const dates = D.dates.slice(sI, eI + 1), latest = dates[dates.length - 1];
-    const rows = dates.map((d, k) => { const r = {date: d}; METRICS.forEach(m => r[m.key] = SERIES[active][m.key][sI + k]); return r; });
+    const dates = D.dates.slice(sI, eI + 1), latest = dates[dates.length - 1], cur = curSeries();
+    const rows = dates.map((d, k) => { const r = {date: d}; METRICS.forEach(m => r[m.key] = cur[m.key][sI + k]); return r; });
     rows.sort((a, b) => {
       const av = a[sortKey], bv = b[sortKey];
       if (sortKey === 'date') return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
@@ -1727,7 +1751,12 @@ function makeDailyOverview(cfg){
     $('presetSeg').addEventListener('click', ev => { const b = ev.target.closest('button'); if (b) applyPreset(b.dataset.preset); });
     $('seriesSeg').addEventListener('click', ev => {
       const b = ev.target.closest('button'); if (!b) return;
-      active = b.dataset.s; renderSeriesSeg(); renderAll();
+      const k = b.dataset.s;
+      // 전체 → 계정 하나 누르면 그 계정만 / 이후 누르는 계정은 더하기·빼기 / 다 고르거나 다 빼면 전체로
+      if (k === 'all') sel = null;
+      else if (!sel) sel = new Set([k]);
+      else { sel.has(k) ? sel.delete(k) : sel.add(k); if (!sel.size || sel.size === GROUPS.length) sel = null; }
+      renderSeriesSeg(); renderAll();
     });
     $('startInput').addEventListener('change', onDateInput);
     $('endInput').addEventListener('change', onDateInput);
