@@ -326,6 +326,15 @@ def read_sheet_rows_flex(sheet_name, spec, required=(), fetch_fn=None):
 
 def _num_or_none(v):
     v = parse_gviz_value(v)
+    if isinstance(v, str):
+        # 시트에 '2,263,366' / '0.30%' / '₩914,257' 처럼 텍스트로 들어간 숫자도 읽는다
+        t = v.strip().lstrip("'").replace(',', '').replace('₩', '').replace(' ', '')
+        pct = t.endswith('%')
+        if pct:
+            t = t[:-1]
+        if re.fullmatch(r'-?\d+(?:\.\d+)?', t):
+            return float(t) / 100 if pct else float(t)
+        return None
     if isinstance(v, bool) or not isinstance(v, (int, float)):
         return None
     return float(v)
